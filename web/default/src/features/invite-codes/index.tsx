@@ -1,59 +1,83 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { Loader2, Plus, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { Copy, Loader2, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { SectionPageLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import { formatTimestampToDate } from '@/lib/format'
+import { DataTablePage, useDataTable } from '@/components/data-table'
 import {
   getInviteCodes,
   generateInviteCodes,
   deleteInviteCode,
 } from './api'
+import { useInviteCodesColumns } from './columns'
+import { InviteCodeBulkActions } from './bulk-actions'
 import type { InviteCode } from './types'
 
 export function InviteCodes() {
   const { t } = useTranslation()
-  const [loading, setLoading] = useState(false)
-  const [data, setData] = useState<InviteCode[]>([])
-  const [page, setPage] = useState(1)
-  const [pageSize] = useState(20)
-  const [total, setTotal] = useState(0)
   const [generateCount, setGenerateCount] = useState(5)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [refreshTrigger, setRefreshTrigger] = useState(0)
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 20 })
 
-  const loadData = useCallback(
-    async (targetPage = page) => {
-      setLoading(true)
+  const triggerRefresh = useCallback(() => {
+    setRefreshTrigger((prev) => prev + 1)
+  }, [])
+
+  const handleDelete = useCallback(
+    async (id: number) => {
       try {
-        const res = await getInviteCodes({ p: targetPage, page_size: pageSize })
+        const res = await deleteInviteCode(id)
         if (!res.success) {
-          toast.error(res.message || t('Failed to load invite codes'))
+          toast.error(res.message || t('Failed to delete'))
           return
         }
-        setData(res.data?.items || [])
-        setTotal(res.data?.total || 0)
-        setPage(targetPage)
+        toast.success(t('Deleted'))
+        triggerRefresh()
       } catch {
-        toast.error(t('Failed to load invite codes'))
-      } finally {
-        setLoading(false)
+        toast.error(t('Failed to delete'))
       }
     },
-    [page, pageSize, t]
+    [t, triggerRefresh]
   )
 
+  const columns = useInviteCodesColumns(handleDelete)
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: [
+      'invite-codes',
+      pagination.pageIndex + 1,
+      pagination.pageSize,
+      refreshTrigger,
+    ],
+    queryFn: async () => {
+      const result = await getInviteCodes({
+        p: pagination.pageIndex + 1,
+        page_size: pagination.pageSize,
+      })
+      return {
+        items: result.data?.items || [],
+        total: result.data?.total || 0,
+      }
+    },
+    placeholderData: (previousData) => previousData,
+  })
+
+  const { table } = useDataTable<InviteCode>({
+    data: data?.items || [],
+    columns,
+    enableRowSelection: true,
+    pagination,
+    onPaginationChange: setPagination,
+    manualPagination: true,
+    totalCount: data?.total || 0,
+  })
+
   const handleGenerate = async () => {
-    setLoading(true)
+    setIsGenerating(true)
     try {
       const count = Math.max(1, Math.min(100, Number(generateCount) || 1))
       const res = await generateInviteCodes(count)
@@ -66,45 +90,13 @@ export function InviteCodes() {
           count: res.data?.length || 0,
         })
       )
-      loadData(1)
+      triggerRefresh()
     } catch {
       toast.error(t('Failed to generate invite codes'))
     } finally {
-      setLoading(false)
+      setIsGenerating(false)
     }
   }
-
-  const handleDelete = async (id: number) => {
-    setLoading(true)
-    try {
-      const res = await deleteInviteCode(id)
-      if (!res.success) {
-        toast.error(res.message || t('Failed to delete'))
-        return
-      }
-      toast.success(t('Deleted'))
-      loadData(page)
-    } catch {
-      toast.error(t('Failed to delete'))
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleCopy = async (code: string) => {
-    try {
-      await navigator.clipboard.writeText(code)
-      toast.success(t('Copied: {{code}}', { code }))
-    } catch {
-      toast.error(t('Copy failed'))
-    }
-  }
-
-  useEffect(() => {
-    loadData(1)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const totalPages = Math.ceil(total / pageSize)
 
   return (
     <SectionPageLayout fixedContent>
@@ -119,8 +111,8 @@ export function InviteCodes() {
             onChange={(e) => setGenerateCount(Number(e.target.value))}
             className='w-20'
           />
-          <Button onClick={handleGenerate} disabled={loading}>
-            {loading ? (
+          <Button onClick={handleGenerate} disabled={isGenerating}>
+            {isGenerating ? (
               <Loader2 className='mr-2 h-4 w-4 animate-spin' />
             ) : (
               <Plus className='mr-2 h-4 w-4' />
@@ -129,8 +121,8 @@ export function InviteCodes() {
           </Button>
           <Button
             variant='outline'
-            onClick={() => loadData(page)}
-            disabled={loading}
+            onClick={triggerRefresh}
+            disabled={isFetching}
           >
             <RefreshCw className='mr-2 h-4 w-4' />
             {t('Refresh')}
@@ -138,96 +130,19 @@ export function InviteCodes() {
         </div>
       </SectionPageLayout.Actions>
       <SectionPageLayout.Content>
-        <div className='rounded-md border'>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className='w-[80px]'>{t('ID')}</TableHead>
-                <TableHead>{t('Invite Code')}</TableHead>
-                <TableHead className='w-[100px]'>{t('Status')}</TableHead>
-                <TableHead>{t('Created')}</TableHead>
-                <TableHead>{t('Used By')}</TableHead>
-                <TableHead className='w-[100px]'>{t('Actions')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className='text-center py-8'>
-                    {loading ? t('Loading...') : t('No invite codes')}
-                  </TableCell>
-                </TableRow>
-              ) : (
-                data.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className='font-mono text-sm'>
-                      {item.id}
-                    </TableCell>
-                    <TableCell className='font-mono font-semibold'>
-                      {item.code}
-                    </TableCell>
-                    <TableCell>
-                      {item.is_used ? (
-                        <Badge variant='destructive'>{t('Used')}</Badge>
-                      ) : (
-                        <Badge variant='secondary'>{t('Available')}</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className='font-mono text-sm'>
-                      {item.created_time
-                        ? formatTimestampToDate(item.created_time)
-                        : '-'}
-                    </TableCell>
-                    <TableCell>{item.used_by || '-'}</TableCell>
-                    <TableCell>
-                      <div className='flex items-center gap-1'>
-                        <Button
-                          variant='ghost'
-                          size='icon'
-                          onClick={() => handleCopy(item.code)}
-                        >
-                          <Copy className='h-4 w-4' />
-                        </Button>
-                        <Button
-                          variant='ghost'
-                          size='icon'
-                          onClick={() => handleDelete(item.id)}
-                        >
-                          <Trash2 className='h-4 w-4' />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-        {totalPages > 1 && (
-          <div className='flex items-center justify-between py-4'>
-            <span className='text-muted-foreground text-sm'>
-              {t('Total: {{total}}', { total })}
-            </span>
-            <div className='flex gap-2'>
-              <Button
-                variant='outline'
-                size='sm'
-                disabled={page <= 1}
-                onClick={() => loadData(page - 1)}
-              >
-                {t('Previous')}
-              </Button>
-              <Button
-                variant='outline'
-                size='sm'
-                disabled={page >= totalPages}
-                onClick={() => loadData(page + 1)}
-              >
-                {t('Next')}
-              </Button>
-            </div>
-          </div>
-        )}
+        <DataTablePage
+          table={table}
+          columns={columns}
+          isLoading={isLoading}
+          isFetching={isFetching}
+          emptyTitle={t('No invite codes')}
+          emptyDescription={t(
+            'No invite codes available. Generate your first invite codes to get started.'
+          )}
+          skeletonKeyPrefix='invite-codes-skeleton'
+          applyHeaderSize
+          bulkActions={<InviteCodeBulkActions table={table} />}
+        />
       </SectionPageLayout.Content>
     </SectionPageLayout>
   )

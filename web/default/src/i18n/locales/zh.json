@@ -4927,6 +4927,10 @@
         "Please enter an invite code": "请输入邀请码",
         "Generate": "生成",
         "Used By": "使用者",
-        "Manage invite codes for user registration.": "管理用户注册所需的邀请码。"
+        "Manage invite codes for user registration.": "管理用户注册所需的邀请码。",
+        "Export selected codes as CSV": "导出选中的邀请码为 CSV",
+        "Exported {{count}} invite codes": "已导出 {{count}} 个邀请码",
+        "No invite codes available. Generate your first invite codes to get started.": "暂无邀请码。生成第一批邀请码开始使用。",
+        "invite code": "邀请码"
     }
 }
