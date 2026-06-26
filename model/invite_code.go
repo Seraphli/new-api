@@ -79,7 +79,7 @@ func ConsumeInviteCodeTx(tx *gorm.DB, code string, userId int, username string) 
 		return errors.New("invalid or already used invite code")
 	}
 	if invite.IsUsed {
-		return errors.New("invalid or already used invite code")
+		return errors.New("invite code is invalid or already used")
 	}
 	result := tx.Model(&InviteCode{}).
 		Where("id = ? AND is_used = ?", invite.Id, false).

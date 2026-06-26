@@ -217,7 +217,7 @@ func Register(c *gin.Context) {
 	inviterId, _ := model.GetUserIdByAffCode(affCode)
 	inviteCode := strings.TrimSpace(user.InviteCode)
 	if inviteCode == "" {
-		common.ApiErrorMsg(c, "invite code is required")
+		common.ApiErrorI18n(c, i18n.MsgInviteCodeRequired)
 		return
 	}
 	cleanUser := model.User{

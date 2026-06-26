@@ -330,3 +330,9 @@ const (
 	MsgCustomOAuthBindingNotFound   = "custom_oauth.binding_not_found"
 	MsgCustomOAuthProviderIdInvalid = "custom_oauth.provider_id_field_invalid"
 )
+
+// Invite code related messages
+const (
+	MsgInviteCodeRequired = "invite_code.required"
+	MsgInviteCodeInvalid  = "invite_code.invalid_or_used"
+)
