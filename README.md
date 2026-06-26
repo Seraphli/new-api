@@ -62,6 +62,12 @@
 
 ---
 
+> [!NOTE]
+> **This is a fork of [QuantumNous/new-api](https://github.com/QuantumNous/new-api)** with the following additions:
+> - **Invite Code Registration**: Users must enter an admin-generated invite code to register. This is a mandatory gate — not the built-in invite link system. Admin generates codes, distributes them manually, and each code is single-use. See [docs/invite-code.md](docs/invite-code.md) for details.
+
+---
+
 ## 🤝 Trusted Partners
 
 <p align="center">

@@ -134,6 +134,10 @@ export function SidebarModulesSection({
         title: t('Models'),
         description: t('Manage catalog visibility and pricing.'),
       },
+      invite_code: {
+        title: t('Invite codes'),
+        description: t('Manage invite codes for user registration.'),
+      },
       redemption: {
         title: t('Redeem codes'),
         description: t('Create and review invite or credit codes.'),

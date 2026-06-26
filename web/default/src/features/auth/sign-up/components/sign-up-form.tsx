@@ -90,6 +90,7 @@ export function SignUpForm({
       email: '',
       password: '',
       confirmPassword: '',
+      inviteCode: '',
     },
   })
 
@@ -98,6 +99,7 @@ export function SignUpForm({
   const hasUserAgreement = Boolean(status?.user_agreement_enabled)
   const hasPrivacyPolicy = Boolean(status?.privacy_policy_enabled)
   const requiresLegalConsent = hasUserAgreement || hasPrivacyPolicy
+  const inviteCodeRequired = Boolean(status?.invite_code_required)
   const oauthRegisterEnabled =
     status?.oauth_register_enabled ??
     status?.data?.oauth_register_enabled ??
@@ -152,6 +154,11 @@ export function SignUpForm({
       }
     }
 
+    if (inviteCodeRequired && !data.inviteCode?.trim()) {
+      toast.error(t('Please enter an invite code'))
+      return
+    }
+
     if (!validateTurnstile()) return
 
     setIsLoading(true)
@@ -162,6 +169,7 @@ export function SignUpForm({
         email: data.email || undefined,
         verification_code: verificationCode || undefined,
         aff_code: getAffiliateCode(),
+        invite_code: data.inviteCode?.trim() || undefined,
         turnstile: turnstileToken,
       })
 
@@ -276,6 +284,26 @@ export function SignUpForm({
             </FormItem>
           )}
         />
+
+        {/* Invite Code Field */}
+        {inviteCodeRequired && (
+          <FormField
+            control={form.control}
+            name='inviteCode'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Invite Code')}</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder={t('Enter your invite code')}
+                    {...field}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         {/* Email Verification Section */}
         {emailVerificationRequired && (
