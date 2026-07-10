@@ -1,0 +1,7 @@
+{
+  "Generated {{count}} invite codes": "已生成 {{count}} 个邀请码",
+  "Copied: {{code}}": "已复制：{{code}}",
+  "Total: {{total}}": "共 {{total}} 条",
+  "Export selected codes as CSV": "导出选中的邀请码为 CSV",
+  "Exported {{count}} invite codes": "已导出 {{count}} 个邀请码"
+}
