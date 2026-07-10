@@ -223,28 +223,98 @@ func generateStopBlock(index int) *dto.ClaudeResponse {
 	}
 }
 
+// buildClaudeUsageFromOpenAIUsage maps OpenAI-compatible usage into Anthropic Claude usage.
+//
+// OpenAI prompt_tokens is typically a total that already includes cached_tokens.
+// Claude clients (e.g. Claude Code) often sum input_tokens + cache_read_input_tokens,
+// so copying PromptTokens into InputTokens while also reporting CachedTokens as
+// CacheReadInputTokens double-counts cache hits.
+//
+// Provenance (UsageSemantic / UsageSource) decides whether create is also subtracted:
+// only the known inverse path (openai + source=anthropic) subtracts create from prompt.
 func buildClaudeUsageFromOpenAIUsage(oaiUsage *dto.Usage) *dto.ClaudeUsage {
 	if oaiUsage == nil {
 		return nil
 	}
-	cacheCreation5m, cacheCreation1h := NormalizeCacheCreationSplit(
-		oaiUsage.PromptTokensDetails.CachedCreationTokens,
-		oaiUsage.ClaudeCacheCreation5mTokens,
-		oaiUsage.ClaudeCacheCreation1hTokens,
-	)
-	usage := &dto.ClaudeUsage{
-		InputTokens:              oaiUsage.PromptTokens,
-		OutputTokens:             oaiUsage.CompletionTokens,
-		CacheCreationInputTokens: oaiUsage.PromptTokensDetails.CachedCreationTokens,
-		CacheReadInputTokens:     oaiUsage.PromptTokensDetails.CachedTokens,
+	prompt := oaiUsage.PromptTokens
+	if prompt < 0 {
+		prompt = 0
 	}
-	if cacheCreation5m > 0 || cacheCreation1h > 0 {
-		usage.CacheCreation = &dto.ClaudeCacheCreationUsage{
-			Ephemeral5mInputTokens: cacheCreation5m,
-			Ephemeral1hInputTokens: cacheCreation1h,
+	rawRead := oaiUsage.PromptTokensDetails.CachedTokens
+	if rawRead < 0 {
+		rawRead = 0
+	}
+	rawCreate := oaiUsage.PromptTokensDetails.CachedCreationTokens
+	if rawCreate < 0 {
+		rawCreate = 0
+	}
+
+	var input, read, create int
+	switch {
+	case oaiUsage.UsageSemantic == "anthropic":
+		// PromptTokens is already non-cache input under Anthropic semantics.
+		input = prompt
+		read = rawRead
+		create = rawCreate
+	case oaiUsage.UsageSemantic == "openai" && oaiUsage.UsageSource == "anthropic":
+		// Known inverse of buildOpenAIStyleUsageFromClaudeUsage: prompt = input+read+create.
+		read = rawRead
+		if read > prompt {
+			read = prompt
 		}
+		create = rawCreate
+		if create > prompt-read {
+			create = prompt - read
+		}
+		input = prompt - read - create
+	default:
+		// Empty semantic / standard OpenAI-compatible: only subtract cache read.
+		// Do not subtract create without provenance that create is included in prompt.
+		read = rawRead
+		if read > prompt {
+			read = prompt
+		}
+		create = rawCreate
+		input = prompt - read
+	}
+
+	usage := &dto.ClaudeUsage{
+		InputTokens:              input,
+		OutputTokens:             oaiUsage.CompletionTokens,
+		CacheCreationInputTokens: create,
+		CacheReadInputTokens:     read,
+	}
+	if create > 0 {
+		usage.CacheCreation = consistentCacheCreationNested(
+			create,
+			oaiUsage.ClaudeCacheCreation5mTokens,
+			oaiUsage.ClaudeCacheCreation1hTokens,
+		)
 	}
 	return usage
+}
+
+// consistentCacheCreationNested builds nested 5m/1h breakdown that cannot exceed emittedCreate.
+// Overfull, negative, or otherwise untrusted splits yield nil (omit nested field).
+func consistentCacheCreationNested(emittedCreate int, tokens5m int, tokens1h int) *dto.ClaudeCacheCreationUsage {
+	if emittedCreate <= 0 {
+		return nil
+	}
+	if tokens5m < 0 || tokens1h < 0 {
+		return nil
+	}
+	// Overflow-safe overfull: s1 > emittedCreate OR s5 > emittedCreate-s1.
+	if tokens1h > emittedCreate || tokens5m > emittedCreate-tokens1h {
+		return nil
+	}
+	n5, n1 := NormalizeCacheCreationSplit(emittedCreate, tokens5m, tokens1h)
+	if n5 < 0 || n1 < 0 || n5+n1 != emittedCreate {
+		return nil
+	}
+	return &dto.ClaudeCacheCreationUsage{
+		Ephemeral5mInputTokens: n5,
+		Ephemeral1hInputTokens: n1,
+	}
 }
 
 func NormalizeCacheCreationSplit(totalTokens int, tokens5m int, tokens1h int) (int, int) {

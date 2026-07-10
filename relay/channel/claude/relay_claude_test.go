@@ -373,3 +373,39 @@ func TestRequestOpenAI2ClaudeMessage_ClaudeOpus48ThinkingUsesAdaptiveHighEffort(
 	require.Nil(t, claudeRequest.TopP)
 	require.Nil(t, claudeRequest.TopK)
 }
+
+func TestOpenAIClaudeUsageRoundTripViaResponse(t *testing.T) {
+	// P4: inverse (unexported) then ResponseOpenAI2Claude (exported service).
+	// Claude-style internal usage: input=100, read=30, create=50 → OpenAI prompt=180.
+	internal := &dto.Usage{
+		PromptTokens:     100,
+		CompletionTokens: 20,
+		PromptTokensDetails: dto.InputTokenDetails{
+			CachedTokens:         30,
+			CachedCreationTokens: 50,
+		},
+		ClaudeCacheCreation5mTokens: 10,
+		ClaudeCacheCreation1hTokens: 20,
+		UsageSemantic:               "anthropic",
+	}
+	openAIUsage := buildOpenAIStyleUsageFromClaudeUsage(internal)
+	require.Equal(t, 180, openAIUsage.PromptTokens)
+	require.Equal(t, "openai", openAIUsage.UsageSemantic)
+	require.Equal(t, "anthropic", openAIUsage.UsageSource)
+
+	msg := dto.Message{Role: "assistant"}
+	msg.SetStringContent("ok")
+	resp := service.ResponseOpenAI2Claude(&dto.OpenAITextResponse{
+		Id:      "chatcmpl_rt",
+		Model:   "test",
+		Usage:   openAIUsage,
+		Choices: []dto.OpenAITextResponseChoice{{Message: msg, FinishReason: "stop"}},
+	}, nil)
+	require.NotNil(t, resp)
+	require.NotNil(t, resp.Usage)
+	assert.Equal(t, 100, resp.Usage.InputTokens)
+	assert.Equal(t, 30, resp.Usage.CacheReadInputTokens)
+	assert.Equal(t, 50, resp.Usage.CacheCreationInputTokens)
+	assert.Equal(t, 20, resp.Usage.OutputTokens)
+	assert.Equal(t, 180, resp.Usage.InputTokens+resp.Usage.CacheReadInputTokens+resp.Usage.CacheCreationInputTokens)
+}
