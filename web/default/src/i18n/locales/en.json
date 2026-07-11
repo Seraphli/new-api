@@ -5113,12 +5113,11 @@
     "No invite codes available. Generate your first invite codes to get started.": "暂无邀请码。生成第一批邀请码开始使用。",
     "invite code": "邀请码"
   },
-  "Request field maps": "Request field maps",
-  "Map selected Claude request fields onto the converted OpenAI body. Empty list = disabled. service_tier mapping also needs allow service_tier on this channel.": "Map selected Claude request fields onto the converted OpenAI body. Empty list = disabled. service_tier mapping also needs allow service_tier on this channel.",
-  "Claude → OpenAI": "Claude → OpenAI",
-  "effort → reasoning_effort": "effort → reasoning_effort",
-  "service_tier → service_tier": "service_tier → service_tier",
-  "Add effort map": "Add effort map",
-  "Add service_tier map": "Add service_tier map",
-  "Delete": "Delete"
+  "Delete": "Delete",
+  "Enable request field maps": "Enable request field maps",
+  "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.": "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.",
+  "Request field maps JSON": "Request field maps JSON",
+  "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.",
+  "Fill effort example": "Fill effort example",
+  "Fill effort + service_tier example": "Fill effort + service_tier example"
 }

@@ -50,8 +50,11 @@ type ChannelOtherSettings struct {
 	UpstreamModelUpdateLastRemovedModels  []string              `json:"upstream_model_update_last_removed_models,omitempty"`  // 上次检测到的可删除模型
 	UpstreamModelUpdateIgnoredModels      []string              `json:"upstream_model_update_ignored_models,omitempty"`       // 手动忽略的模型
 	AdvancedCustom                        *AdvancedCustomConfig `json:"advanced_custom,omitempty"`
+	// RequestFieldMapsEnabled is presence-aware: nil = key absent (fallback len(maps)>0);
+	// non-nil false keeps maps but disables Apply; non-nil true requires non-empty maps.
+	RequestFieldMapsEnabled *bool `json:"request_field_maps_enabled,omitempty"`
 	// RequestFieldMaps maps Claude fields onto converted OpenAI JSON (per-channel).
-	// Empty means zero behavior change.
+	// Empty means zero behavior change when not enabled.
 	RequestFieldMaps []RequestFieldMap `json:"request_field_maps,omitempty"`
 }
 
@@ -135,6 +138,25 @@ func CanonicalizeOtherSettingsJSON(otherSettings string) (string, error) {
 		return "", err
 	}
 	return string(out), nil
+}
+
+// EffectiveRequestFieldMapsEnabled implements presence-aware toggle semantics.
+func EffectiveRequestFieldMapsEnabled(s ChannelOtherSettings) bool {
+	if s.RequestFieldMapsEnabled != nil {
+		return *s.RequestFieldMapsEnabled
+	}
+	return len(s.RequestFieldMaps) > 0
+}
+
+// ValidateRequestFieldMapsConfig validates maps and enabled constraints together.
+func ValidateRequestFieldMapsConfig(s ChannelOtherSettings) error {
+	if err := ValidateRequestFieldMaps(s.RequestFieldMaps); err != nil {
+		return err
+	}
+	if s.RequestFieldMapsEnabled != nil && *s.RequestFieldMapsEnabled && len(s.RequestFieldMaps) == 0 {
+		return fmt.Errorf("request_field_maps_enabled is true but request_field_maps is empty")
+	}
+	return nil
 }
 
 // ValidateRequestFieldMaps rejects non-allowlisted maps and duplicate destinations.

@@ -5113,12 +5113,11 @@
     "No invite codes available. Generate your first invite codes to get started.": "暂无邀请码。生成第一批邀请码开始使用。",
     "invite code": "邀请码"
   },
-  "Request field maps": "リクエストフィールドマップ",
-  "Map selected Claude request fields onto the converted OpenAI body. Empty list = disabled. service_tier mapping also needs allow service_tier on this channel.": "選択した Claude リクエストフィールドを変換後の OpenAI ボディへマップします。空リストは無効です。service_tier マップにはこのチャネルで service_tier 許可も必要です。",
-  "Claude → OpenAI": "Claude → OpenAI",
-  "effort → reasoning_effort": "effort → reasoning_effort",
-  "service_tier → service_tier": "service_tier → service_tier",
-  "Add effort map": "effort マップを追加",
-  "Add service_tier map": "service_tier マップを追加",
-  "Delete": "削除"
+  "Delete": "削除",
+  "Enable request field maps": "リクエストフィールドマップを有効化",
+  "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.": "オンにすると Claude→OpenAI 変換時に下の JSON マップを適用します。オフでも設定は保持され、適用だけしません。",
+  "Request field maps JSON": "リクエストフィールドマップ JSON",
+  "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "when/from/to の JSON 配列。サーバーは許可されたペアのみ受け付けます。service_tier はチャンネルで service_tier 許可も必要です。",
+  "Fill effort example": "effort 例を入れる",
+  "Fill effort + service_tier example": "effort+service_tier 例を入れる"
 }

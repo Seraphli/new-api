@@ -178,16 +178,9 @@ export const channelFormSchema = z
       .optional()
       .refine(isOptionalJsonObject, ERROR_MESSAGES.INVALID_JSON),
     advanced_custom: z.string().optional(),
-    // Claude→OpenAI allowlisted maps (stored in settings.request_field_maps)
-    request_field_maps: z
-      .array(
-        z.object({
-          when: z.string().optional(),
-          from: z.string(),
-          to: z.string(),
-        })
-      )
-      .optional(),
+    // Claude→OpenAI maps: master toggle + JSON textarea (OtherSettings)
+    request_field_maps_enabled: z.boolean().optional(),
+    request_field_maps_json: z.string().optional(),
     other: z.string().optional(),
     // Multi-key options (not sent to backend directly)
     multi_key_mode: z.enum(['single', 'batch', 'multi_to_single']).optional(),
@@ -359,7 +352,8 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   upstream_model_update_auto_sync_enabled: false,
   upstream_model_update_ignored_models: '',
   advanced_custom: '',
-  request_field_maps: [],
+  request_field_maps_enabled: false,
+  request_field_maps_json: '',
 }
 
 // ============================================================================
@@ -416,11 +410,8 @@ export function transformChannelToFormDefaults(
   let upstreamModelUpdateAutoSyncEnabled = false
   let upstreamModelUpdateIgnoredModels = ''
   let advancedCustom = ''
-  let requestFieldMaps: {
-    when?: string
-    from: string
-    to: string
-  }[] = []
+  let requestFieldMapsEnabled = false
+  let requestFieldMapsJson = ''
 
   if (channel.settings) {
     try {
@@ -450,20 +441,19 @@ export function transformChannelToFormDefaults(
         advancedCustom = stringifyAdvancedCustomConfig(parsed.advanced_custom)
       }
       const maps = parsed.request_field_maps
-      if (Array.isArray(maps)) {
-        requestFieldMaps = maps
-          .filter(
-            (m: { from?: string; to?: string }) =>
-              m && typeof m.from === 'string' && typeof m.to === 'string'
-          )
-          .map((m: { when?: string; from: string; to: string }) => ({
-            when:
-              !m.when || String(m.when).trim() === ''
-                ? 'claude_to_openai'
-                : String(m.when).trim(),
-            from: String(m.from).trim(),
-            to: String(m.to).trim(),
-          }))
+      const hasMaps = Array.isArray(maps) && maps.length > 0
+      if (hasMaps) {
+        requestFieldMapsJson = JSON.stringify(maps, null, 2)
+      }
+      if (
+        Object.prototype.hasOwnProperty.call(
+          parsed,
+          'request_field_maps_enabled'
+        )
+      ) {
+        requestFieldMapsEnabled = parsed.request_field_maps_enabled === true
+      } else {
+        requestFieldMapsEnabled = hasMaps
       }
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -516,7 +506,8 @@ export function transformChannelToFormDefaults(
     upstream_model_update_auto_sync_enabled: upstreamModelUpdateAutoSyncEnabled,
     upstream_model_update_ignored_models: upstreamModelUpdateIgnoredModels,
     advanced_custom: advancedCustom,
-    request_field_maps: requestFieldMaps,
+    request_field_maps_enabled: requestFieldMapsEnabled,
+    request_field_maps_json: requestFieldMapsJson,
   }
 }
 
@@ -655,32 +646,43 @@ export function buildSettingsJSON(formData: ChannelFormValues): string {
     delete settingsObj.advanced_custom
   }
 
-  // Request field maps (OtherSettings): multi-row allowlisted editor
+  // Request field maps (OtherSettings): enabled toggle + JSON textarea
   {
-    const rows = Array.isArray(formData.request_field_maps)
-      ? formData.request_field_maps
-      : []
-    const cleaned = rows
-      .filter(
-        (m) =>
-          m &&
-          typeof m.from === 'string' &&
-          typeof m.to === 'string' &&
-          m.from.trim() !== '' &&
-          m.to.trim() !== ''
-      )
-      .map((m) => ({
-        when:
-          !m.when || String(m.when).trim() === ''
-            ? 'claude_to_openai'
-            : String(m.when).trim(),
-        from: String(m.from).trim(),
-        to: String(m.to).trim(),
-      }))
-    if (cleaned.length > 0) {
-      settingsObj.request_field_maps = cleaned
-    } else if ('request_field_maps' in settingsObj) {
-      delete settingsObj.request_field_maps
+    // Always write enabled key so explicit false is preserved (presence-aware).
+    settingsObj.request_field_maps_enabled =
+      formData.request_field_maps_enabled === true
+    const raw = String(formData.request_field_maps_json || '').trim()
+    if (raw === '') {
+      if ('request_field_maps' in settingsObj) {
+        delete settingsObj.request_field_maps
+      }
+    } else {
+      const parsed = JSON.parse(raw)
+      if (!Array.isArray(parsed)) {
+        throw new Error('request_field_maps_json must be a JSON array')
+      }
+      const cleaned = parsed
+        .filter(
+          (m: { from?: string; to?: string }) =>
+            m &&
+            typeof m.from === 'string' &&
+            typeof m.to === 'string' &&
+            m.from.trim() !== '' &&
+            m.to.trim() !== ''
+        )
+        .map((m: { when?: string; from: string; to: string }) => ({
+          when:
+            !m.when || String(m.when).trim() === ''
+              ? 'claude_to_openai'
+              : String(m.when).trim(),
+          from: String(m.from).trim(),
+          to: String(m.to).trim(),
+        }))
+      if (cleaned.length > 0) {
+        settingsObj.request_field_maps = cleaned
+      } else if ('request_field_maps' in settingsObj) {
+        delete settingsObj.request_field_maps
+      }
     }
   }
 
@@ -864,57 +866,44 @@ export function formatGroups(groups: string[]): string {
 
 
 // ============================================================================
-// Request field map allowlist (UI + serializer)
+// Request field maps JSON helpers (UI)
 // ============================================================================
 
-export const REQUEST_FIELD_MAP_WHEN_OPTIONS = [
-  { value: 'claude_to_openai', labelKey: 'Claude → OpenAI' },
-] as const
-
-export const REQUEST_FIELD_MAP_PAIR_OPTIONS = [
+export const REQUEST_FIELD_MAPS_EXAMPLE_P1 = `[
   {
-    id: 'P1',
-    from: 'output_config.effort',
-    to: 'reasoning_effort',
-    labelKey: 'effort → reasoning_effort',
-  },
-  {
-    id: 'P2',
-    from: 'service_tier',
-    to: 'service_tier',
-    labelKey: 'service_tier → service_tier',
-  },
-] as const
-
-export type RequestFieldMapRow = {
-  when?: string
-  from: string
-  to: string
-}
-
-export function validateRequestFieldMapsClient(
-  maps: RequestFieldMapRow[] | undefined
-): string | null {
-  if (!maps || maps.length === 0) return null
-  const allowed = new Set(
-    REQUEST_FIELD_MAP_PAIR_OPTIONS.map((p) => `${p.from}=>${p.to}`)
-  )
-  const seenTo = new Set<string>()
-  for (let i = 0; i < maps.length; i++) {
-    const m = maps[i]
-    const when = (m.when || '').trim()
-    if (when && when !== 'claude_to_openai') {
-      return `request_field_maps[${i}]: unsupported when`
-    }
-    const pair = `${(m.from || '').trim()}=>${(m.to || '').trim()}`
-    if (!allowed.has(pair)) {
-      return `request_field_maps[${i}]: pair not allowlisted`
-    }
-    const to = (m.to || '').trim()
-    if (seenTo.has(to)) {
-      return `request_field_maps[${i}]: duplicate to ${to}`
-    }
-    seenTo.add(to)
+    "when": "claude_to_openai",
+    "from": "output_config.effort",
+    "to": "reasoning_effort"
   }
-  return null
+]`
+
+export const REQUEST_FIELD_MAPS_EXAMPLE_P1_P2 = `[
+  {
+    "when": "claude_to_openai",
+    "from": "output_config.effort",
+    "to": "reasoning_effort"
+  },
+  {
+    "when": "claude_to_openai",
+    "from": "service_tier",
+    "to": "service_tier"
+  }
+]`
+
+export function parseRequestFieldMapsJson(
+  raw: string | undefined
+): { ok: true; maps: { when: string; from: string; to: string }[] } | { ok: false; error: string } {
+  const trimmed = String(raw || '').trim()
+  if (trimmed === '') {
+    return { ok: true, maps: [] }
+  }
+  try {
+    const parsed = JSON.parse(trimmed)
+    if (!Array.isArray(parsed)) {
+      return { ok: false, error: 'must be a JSON array' }
+    }
+    return { ok: true, maps: parsed }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'invalid JSON' }
+  }
 }

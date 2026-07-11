@@ -72,7 +72,7 @@ import {
   collectInvalidStatusCodeEntries,
   collectNewDisallowedStatusCodeRedirects,
 } from './statusCodeRiskGuard';
-import { loadRequestFieldMaps, saveRequestFieldMaps } from '../../../../helpers/requestFieldMaps';
+import { loadRequestFieldMapsState, saveRequestFieldMapsState } from '../../../../helpers/requestFieldMaps';
 import {
   IconSave,
   IconClose,
@@ -193,7 +193,8 @@ const EditChannelModal = (props) => {
     thinking_to_content: false,
     proxy: '',
     pass_through_body_enabled: false,
-    request_field_maps: [],
+    request_field_maps_enabled: false,
+    request_field_maps_json: '',
     system_prompt: '',
     system_prompt_override: false,
     settings: '',
@@ -516,7 +517,8 @@ const EditChannelModal = (props) => {
     thinking_to_content: false,
     proxy: '',
     pass_through_body_enabled: false,
-    request_field_maps: [],
+    request_field_maps_enabled: false,
+    request_field_maps_json: '',
     system_prompt: '',
   });
   const showApiConfigCard = true; // 控制是否显示 API 配置卡片
@@ -902,7 +904,9 @@ const EditChannelModal = (props) => {
           data.is_enterprise_account =
             parsedSettings.openrouter_enterprise === true;
           {
-            data.request_field_maps = loadRequestFieldMaps(parsedSettings);
+            const rfm = loadRequestFieldMapsState(parsedSettings);
+            data.request_field_maps_enabled = rfm.request_field_maps_enabled;
+            data.request_field_maps_json = rfm.request_field_maps_json;
           }
           // 读取字段透传控制设置
           data.allow_service_tier = parsedSettings.allow_service_tier || false;
@@ -1039,7 +1043,7 @@ const EditChannelModal = (props) => {
         (data.system_prompt && data.system_prompt.trim()) ||
         data.thinking_to_content ||
         data.pass_through_body_enabled ||
-        (Array.isArray(data.request_field_maps) && data.request_field_maps.length > 0) ||
+        data.request_field_maps_enabled || Boolean(data.request_field_maps_json && String(data.request_field_maps_json).trim()) ||
         data.force_format ||
         data.claude_beta_query ||
         data.system_prompt_override;
@@ -1382,7 +1386,8 @@ const EditChannelModal = (props) => {
       thinking_to_content: false,
       proxy: '',
       pass_through_body_enabled: false,
-      request_field_maps: [],
+      request_field_maps_enabled: false,
+    request_field_maps_json: '',
       system_prompt: '',
       system_prompt_override: false,
     });
@@ -1831,7 +1836,11 @@ const EditChannelModal = (props) => {
       settings.upstream_model_update_last_check_time = 0;
     }
 
-    saveRequestFieldMaps(settings, localInputs.request_field_maps);
+    saveRequestFieldMapsState(
+      settings,
+      localInputs.request_field_maps_enabled,
+      localInputs.request_field_maps_json,
+    );
 
     localInputs.settings = JSON.stringify(settings);
 
@@ -1840,7 +1849,8 @@ const EditChannelModal = (props) => {
     delete localInputs.thinking_to_content;
     delete localInputs.proxy;
     delete localInputs.pass_through_body_enabled;
-    delete localInputs.request_field_maps;
+    delete localInputs.request_field_maps_enabled;
+    delete localInputs.request_field_maps_json;
     delete localInputs.system_prompt;
     delete localInputs.system_prompt_override;
     delete localInputs.is_enterprise_account;
@@ -2534,78 +2544,76 @@ const EditChannelModal = (props) => {
                   <Form.Switch field='thinking_to_content' label={t('思考内容转换')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleChannelSettingsChange('thinking_to_content', value)} extraText={t('将 reasoning_content 转换为 <think> 标签拼接到内容中')} />
                   <Form.Switch field='pass_through_body_enabled' label={t('透传请求体')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleChannelSettingsChange('pass_through_body_enabled', value)} extraText={t('启用请求体透传功能')} />
                   <div className='mb-3'>
+                    <Form.Switch
+                      field='request_field_maps_enabled'
+                      label={t('启用请求字段映射')}
+                      checkedText={t('开')}
+                      uncheckedText={t('关')}
+                      onChange={(value) =>
+                        handleInputChange('request_field_maps_enabled', value)
+                      }
+                      extraText={t(
+                        '开启后才会在 Claude→OpenAI 转换时应用下方 JSON 映射；关闭则保留配置但不生效。',
+                      )}
+                    />
                     <Text className='text-sm font-medium text-gray-700 mb-1 block'>
-                      {t('请求字段映射')}
+                      {t('请求字段映射 JSON')}
                     </Text>
                     <Text className='text-xs text-gray-500 mb-2 block'>
-                      {t('将选定的 Claude 请求字段映射到转换后的 OpenAI 请求体。空列表=关闭。service_tier 映射需同时开启「允许 service_tier 透传」。')}
+                      {t(
+                        'JSON 数组，每项含 when/from/to。服务端仅接受白名单映射对。service_tier 映射需同时开启「允许 service_tier 透传」。',
+                      )}
                     </Text>
-                    {(Array.isArray(inputs.request_field_maps) ? inputs.request_field_maps : []).map((row, index) => (
-                      <div key={`${row.from}-${row.to}-${index}`} className='flex flex-wrap gap-2 items-center mb-2'>
-                        <select
-                          className='border rounded px-2 py-1 text-sm'
-                          value={row.when || 'claude_to_openai'}
-                          onChange={(e) => {
-                            const next = [...(inputs.request_field_maps || [])];
-                            next[index] = { ...next[index], when: e.target.value };
-                            handleInputChange('request_field_maps', next);
-                          }}
-                        >
-                          <option value='claude_to_openai'>{t('Claude → OpenAI')}</option>
-                        </select>
-                        <select
-                          className='border rounded px-2 py-1 text-sm flex-1'
-                          value={`${row.from}=>${row.to}`}
-                          onChange={(e) => {
-                            const [from, to] = e.target.value.split('=>');
-                            const next = [...(inputs.request_field_maps || [])];
-                            next[index] = { ...next[index], from, to };
-                            handleInputChange('request_field_maps', next);
-                          }}
-                        >
-                          <option value='output_config.effort=>reasoning_effort'>{t('effort → reasoning_effort')}</option>
-                          <option value='service_tier=>service_tier'>{t('service_tier → service_tier')}</option>
-                        </select>
-                        <button
-                          type='button'
-                          className='border rounded px-2 py-1 text-sm'
-                          onClick={() => {
-                            const next = (inputs.request_field_maps || []).filter((_, i) => i !== index);
-                            handleInputChange('request_field_maps', next);
-                          }}
-                        >
-                          {t('删除')}
-                        </button>
-                      </div>
-                    ))}
+                    <textarea
+                      className='w-full border rounded px-2 py-1 text-sm font-mono mb-2'
+                      rows={8}
+                      value={inputs.request_field_maps_json || ''}
+                      onChange={(e) =>
+                        handleInputChange('request_field_maps_json', e.target.value)
+                      }
+                      placeholder='[]'
+                    />
                     <div className='flex flex-wrap gap-2'>
                       <button
                         type='button'
                         className='border rounded px-2 py-1 text-sm'
-                        onClick={() => {
-                          const rows = Array.isArray(inputs.request_field_maps) ? inputs.request_field_maps : [];
-                          if (rows.some((r) => r && r.to === 'reasoning_effort')) return;
-                          handleInputChange('request_field_maps', [
-                            ...rows,
-                            { when: 'claude_to_openai', from: 'output_config.effort', to: 'reasoning_effort' },
-                          ]);
-                        }}
+                        onClick={() =>
+                          handleInputChange(
+                            'request_field_maps_json',
+                            `[
+  {
+    "when": "claude_to_openai",
+    "from": "output_config.effort",
+    "to": "reasoning_effort"
+  }
+]`,
+                          )
+                        }
                       >
-                        {t('添加 effort 映射')}
+                        {t('填入 effort 示例')}
                       </button>
                       <button
                         type='button'
                         className='border rounded px-2 py-1 text-sm'
-                        onClick={() => {
-                          const rows = Array.isArray(inputs.request_field_maps) ? inputs.request_field_maps : [];
-                          if (rows.some((r) => r && r.to === 'service_tier')) return;
-                          handleInputChange('request_field_maps', [
-                            ...rows,
-                            { when: 'claude_to_openai', from: 'service_tier', to: 'service_tier' },
-                          ]);
-                        }}
+                        onClick={() =>
+                          handleInputChange(
+                            'request_field_maps_json',
+                            `[
+  {
+    "when": "claude_to_openai",
+    "from": "output_config.effort",
+    "to": "reasoning_effort"
+  },
+  {
+    "when": "claude_to_openai",
+    "from": "service_tier",
+    "to": "service_tier"
+  }
+]`,
+                          )
+                        }
                       >
-                        {t('添加 service_tier 映射')}
+                        {t('填入 effort+service_tier 示例')}
                       </button>
                     </div>
                   </div>

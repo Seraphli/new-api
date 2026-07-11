@@ -5113,12 +5113,11 @@
     "No invite codes available. Generate your first invite codes to get started.": "暂无邀请码。生成第一批邀请码开始使用。",
     "invite code": "邀请码"
   },
-  "Request field maps": "Correspondances de champs de requête",
-  "Map selected Claude request fields onto the converted OpenAI body. Empty list = disabled. service_tier mapping also needs allow service_tier on this channel.": "Mappe les champs Claude sélectionnés vers le corps OpenAI converti. Liste vide = désactivé. Le mapping service_tier nécessite aussi d autoriser service_tier sur ce canal.",
-  "Claude → OpenAI": "Claude → OpenAI",
-  "effort → reasoning_effort": "effort → reasoning_effort",
-  "service_tier → service_tier": "service_tier → service_tier",
-  "Add effort map": "Ajouter le mapping effort",
-  "Add service_tier map": "Ajouter le mapping service_tier",
-  "Delete": "Supprimer"
+  "Delete": "Supprimer",
+  "Enable request field maps": "Activer les correspondances de champs",
+  "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.": "Si activé, applique les correspondances JSON ci-dessous lors de la conversion Claude→OpenAI. Si désactivé, la config est conservée mais non appliquée.",
+  "Request field maps JSON": "JSON des correspondances de champs",
+  "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "Tableau JSON {when,from,to}. Seules les paires autorisées sont acceptées. service_tier nécessite aussi d autoriser service_tier sur ce canal.",
+  "Fill effort example": "Insérer exemple effort",
+  "Fill effort + service_tier example": "Insérer exemple effort + service_tier"
 }

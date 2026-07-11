@@ -336,8 +336,8 @@ function hasAdvancedSettingsValues(values: ChannelFormValues): boolean {
     values.force_format ||
     values.thinking_to_content ||
     values.pass_through_body_enabled ||
-    (Array.isArray(values.request_field_maps) &&
-      values.request_field_maps.length > 0) ||
+    values.request_field_maps_enabled ||
+    Boolean(values.request_field_maps_json?.trim()) ||
     values.system_prompt_override ||
     values.claude_beta_query ||
     values.upstream_model_update_check_enabled ||
@@ -4118,176 +4118,95 @@ export function ChannelMutateDrawer({
 
                               <FormField
                                 control={form.control}
-                                name='request_field_maps'
-                                render={({ field }) => {
-                                  const rows = Array.isArray(field.value)
-                                    ? field.value
-                                    : []
-                                  const pairOptions = [
-                                    {
-                                      from: 'output_config.effort',
-                                      to: 'reasoning_effort',
-                                      label: t('effort → reasoning_effort'),
-                                    },
-                                    {
-                                      from: 'service_tier',
-                                      to: 'service_tier',
-                                      label: t('service_tier → service_tier'),
-                                    },
-                                  ]
-                                  const usedTos = new Set(
-                                    rows.map((r: { to?: string }) =>
-                                      String(r?.to || '').trim()
-                                    )
-                                  )
-                                  const updateRow = (
-                                    index: number,
-                                    patch: Record<string, string>
-                                  ) => {
-                                    const next = rows.map(
-                                      (
-                                        r: {
-                                          when?: string
-                                          from: string
-                                          to: string
-                                        },
-                                        i: number
-                                      ) => (i === index ? { ...r, ...patch } : r)
-                                    )
-                                    field.onChange(next)
-                                  }
-                                  const removeRow = (index: number) => {
-                                    field.onChange(
-                                      rows.filter(
-                                        (_: unknown, i: number) => i !== index
-                                      )
-                                    )
-                                  }
-                                  const addPair = (from: string, to: string) => {
-                                    if (usedTos.has(to)) return
-                                    field.onChange([
-                                      ...rows,
-                                      {
-                                        when: 'claude_to_openai',
-                                        from,
-                                        to,
-                                      },
-                                    ])
-                                  }
-                                  return (
-                                    <FormItem className='space-y-3 px-4 py-3'>
-                                      <div className='space-y-0.5'>
-                                        <FormLabel>
-                                          {t('Request field maps')}
-                                        </FormLabel>
-                                        <FormDescription>
-                                          {t(
-                                            'Map selected Claude request fields onto the converted OpenAI body. Empty list = disabled. service_tier mapping also needs allow service_tier on this channel.'
-                                          )}
-                                        </FormDescription>
-                                      </div>
-                                      <div className='space-y-2'>
-                                        {rows.map(
-                                          (
-                                            row: {
-                                              when?: string
-                                              from: string
-                                              to: string
-                                            },
-                                            index: number
-                                          ) => (
-                                            <div
-                                              key={`${row.from}-${row.to}-${index}`}
-                                              className='flex flex-wrap items-center gap-2 rounded-md border px-3 py-2'
-                                            >
-                                              <select
-                                                className='h-9 rounded-md border bg-background px-2 text-sm'
-                                                value={
-                                                  row.when ||
-                                                  'claude_to_openai'
-                                                }
-                                                onChange={(e) =>
-                                                  updateRow(index, {
-                                                    when: e.target.value,
-                                                  })
-                                                }
-                                              >
-                                                <option value='claude_to_openai'>
-                                                  {t('Claude → OpenAI')}
-                                                </option>
-                                              </select>
-                                              <select
-                                                className='h-9 min-w-[12rem] flex-1 rounded-md border bg-background px-2 text-sm'
-                                                value={`${row.from}=>${row.to}`}
-                                                onChange={(e) => {
-                                                  const [from, to] =
-                                                    e.target.value.split('=>')
-                                                  updateRow(index, {
-                                                    from,
-                                                    to,
-                                                  })
-                                                }}
-                                              >
-                                                {pairOptions.map((p) => (
-                                                  <option
-                                                    key={p.from + p.to}
-                                                    value={`${p.from}=>${p.to}`}
-                                                    disabled={
-                                                      usedTos.has(p.to) &&
-                                                      p.to !== row.to
-                                                    }
-                                                  >
-                                                    {p.label}
-                                                  </option>
-                                                ))}
-                                              </select>
-                                              <button
-                                                type='button'
-                                                className='h-9 rounded-md border px-3 text-sm'
-                                                onClick={() => removeRow(index)}
-                                              >
-                                                {t('Delete')}
-                                              </button>
-                                            </div>
-                                          )
+                                name='request_field_maps_enabled'
+                                render={({ field }) => (
+                                  <FormItem className='flex items-center justify-between px-4 py-3'>
+                                    <div className='space-y-0.5'>
+                                      <FormLabel>
+                                        {t('Enable request field maps')}
+                                      </FormLabel>
+                                      <FormDescription>
+                                        {t(
+                                          'When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.'
                                         )}
-                                      </div>
-                                      <div className='flex flex-wrap gap-2'>
-                                        <button
-                                          type='button'
-                                          className='h-9 rounded-md border px-3 text-sm'
-                                          onClick={() =>
-                                            addPair(
-                                              'output_config.effort',
-                                              'reasoning_effort'
-                                            )
-                                          }
-                                          disabled={usedTos.has(
-                                            'reasoning_effort'
-                                          )}
-                                        >
-                                          {t('Add effort map')}
-                                        </button>
-                                        <button
-                                          type='button'
-                                          className='h-9 rounded-md border px-3 text-sm'
-                                          onClick={() =>
-                                            addPair(
-                                              'service_tier',
-                                              'service_tier'
-                                            )
-                                          }
-                                          disabled={usedTos.has('service_tier')}
-                                        >
-                                          {t('Add service_tier map')}
-                                        </button>
-                                      </div>
-                                      <FormControl>
-                                        <input type='hidden' />
-                                      </FormControl>
-                                    </FormItem>
-                                  )
-                                }}
+                                      </FormDescription>
+                                    </div>
+                                    <FormControl>
+                                      <Switch
+                                        checked={field.value === true}
+                                        onCheckedChange={field.onChange}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name='request_field_maps_json'
+                                render={({ field }) => (
+                                  <FormItem className='space-y-2 px-4 py-3'>
+                                    <div className='space-y-0.5'>
+                                      <FormLabel>
+                                        {t('Request field maps JSON')}
+                                      </FormLabel>
+                                      <FormDescription>
+                                        {t(
+                                          'JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.'
+                                        )}
+                                      </FormDescription>
+                                    </div>
+                                    <FormControl>
+                                      <textarea
+                                        className='min-h-[8rem] w-full rounded-md border bg-background px-3 py-2 font-mono text-sm'
+                                        placeholder='[]'
+                                        value={field.value || ''}
+                                        onChange={field.onChange}
+                                      />
+                                    </FormControl>
+                                    <div className='flex flex-wrap gap-2'>
+                                      <button
+                                        type='button'
+                                        className='h-9 rounded-md border px-3 text-sm'
+                                        onClick={() =>
+                                          field.onChange(
+                                            `[
+  {
+    "when": "claude_to_openai",
+    "from": "output_config.effort",
+    "to": "reasoning_effort"
+  }
+]`
+                                          )
+                                        }
+                                      >
+                                        {t('Fill effort example')}
+                                      </button>
+                                      <button
+                                        type='button'
+                                        className='h-9 rounded-md border px-3 text-sm'
+                                        onClick={() =>
+                                          field.onChange(
+                                            `[
+  {
+    "when": "claude_to_openai",
+    "from": "output_config.effort",
+    "to": "reasoning_effort"
+  },
+  {
+    "when": "claude_to_openai",
+    "from": "service_tier",
+    "to": "service_tier"
+  }
+]`
+                                          )
+                                        }
+                                      >
+                                        {t('Fill effort + service_tier example')}
+                                      </button>
+                                    </div>
+                                  </FormItem>
+                                )}
                               />
 
                               <FormField

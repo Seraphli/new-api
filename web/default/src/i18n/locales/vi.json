@@ -5113,12 +5113,11 @@
     "No invite codes available. Generate your first invite codes to get started.": "暂无邀请码。生成第一批邀请码开始使用。",
     "invite code": "邀请码"
   },
-  "Request field maps": "Ánh xạ trường yêu cầu",
-  "Map selected Claude request fields onto the converted OpenAI body. Empty list = disabled. service_tier mapping also needs allow service_tier on this channel.": "Ánh xạ các trường Claude đã chọn sang thân OpenAI đã chuyển đổi. Danh sách trống = tắt. Ánh xạ service_tier cũng cần bật cho phép service_tier trên kênh này.",
-  "Claude → OpenAI": "Claude → OpenAI",
-  "effort → reasoning_effort": "effort → reasoning_effort",
-  "service_tier → service_tier": "service_tier → service_tier",
-  "Add effort map": "Thêm map effort",
-  "Add service_tier map": "Thêm map service_tier",
-  "Delete": "Xóa"
+  "Delete": "Xóa",
+  "Enable request field maps": "Bật ánh xạ trường yêu cầu",
+  "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.": "Bật thì áp dụng JSON bên dưới khi chuyển Claude→OpenAI. Tắt thì giữ cấu hình nhưng không áp dụng.",
+  "Request field maps JSON": "JSON ánh xạ trường yêu cầu",
+  "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "Mảng JSON {when,from,to}. Máy chủ chỉ chấp nhận cặp trong allowlist. service_tier cũng cần bật cho phép service_tier trên kênh.",
+  "Fill effort example": "Điền ví dụ effort",
+  "Fill effort + service_tier example": "Điền ví dụ effort+service_tier"
 }

@@ -198,9 +198,13 @@ func TestShouldApplyAndSyncNoOp(t *testing.T) {
 	model_setting.GetGlobalSettings().PassThroughRequestEnabled = false
 
 	claude := &dto.ClaudeRequest{OutputConfig: json.RawMessage(`{"effort":"max"}`)}
+	maps := effortMap()
 	info := &relaycommon.RelayInfo{
 		ChannelMeta: &relaycommon.ChannelMeta{
 			ChannelSetting: dto.ChannelSettings{},
+			ChannelOtherSettings: dto.ChannelOtherSettings{
+				RequestFieldMaps: maps,
+			},
 		},
 		RequestConversionChain: []types.RelayFormat{types.RelayFormatOpenAI},
 		ReasoningEffort:        "pre",
@@ -212,18 +216,18 @@ func TestShouldApplyAndSyncNoOp(t *testing.T) {
 
 	info.RequestConversionChain = []types.RelayFormat{types.RelayFormatClaude}
 	info.FinalRequestRelayFormat = ""
-	if ShouldApplyRequestFieldMaps(info, claude, effortMap()) {
+	if ShouldApplyRequestFieldMaps(info, claude, maps) {
 		t.Fatal("claude final must not shouldMap")
 	}
 
 	info.RequestConversionChain = []types.RelayFormat{types.RelayFormatOpenAI}
 	info.ChannelSetting.PassThroughBodyEnabled = true
-	if ShouldApplyRequestFieldMaps(info, claude, effortMap()) {
+	if ShouldApplyRequestFieldMaps(info, claude, maps) {
 		t.Fatal("pass-through must not shouldMap")
 	}
 	info.ChannelSetting.PassThroughBodyEnabled = false
 
-	if !ShouldApplyRequestFieldMaps(info, claude, effortMap()) {
+	if !ShouldApplyRequestFieldMaps(info, claude, maps) {
 		t.Fatal("expected shouldMap")
 	}
 
@@ -292,11 +296,42 @@ func TestMapOverrideOrderAndSync(t *testing.T) {
 
 func TestShouldApplyOpenAIResponsesExcluded(t *testing.T) {
 	claude := &dto.ClaudeRequest{OutputConfig: json.RawMessage(`{"effort":"max"}`)}
+	maps := effortMap()
 	info := &relaycommon.RelayInfo{
-		ChannelMeta:            &relaycommon.ChannelMeta{},
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelOtherSettings: dto.ChannelOtherSettings{RequestFieldMaps: maps},
+		},
 		RequestConversionChain: []types.RelayFormat{types.RelayFormatOpenAIResponses},
 	}
-	if ShouldApplyRequestFieldMaps(info, claude, effortMap()) {
+	if ShouldApplyRequestFieldMaps(info, claude, maps) {
 		t.Fatal("OpenAI Responses final must not shouldMap")
+	}
+}
+
+
+func TestShouldApplyEnabledFalse(t *testing.T) {
+	originPass := model_setting.GetGlobalSettings().PassThroughRequestEnabled
+	defer func() { model_setting.GetGlobalSettings().PassThroughRequestEnabled = originPass }()
+	model_setting.GetGlobalSettings().PassThroughRequestEnabled = false
+
+	claude := &dto.ClaudeRequest{OutputConfig: json.RawMessage(`{"effort":"max"}`)}
+	disabled := false
+	info := &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelSetting: dto.ChannelSettings{},
+			ChannelOtherSettings: dto.ChannelOtherSettings{
+				RequestFieldMapsEnabled: &disabled,
+				RequestFieldMaps:        effortMap(),
+			},
+		},
+		RequestConversionChain: []types.RelayFormat{types.RelayFormatOpenAI},
+	}
+	if ShouldApplyRequestFieldMaps(info, claude, effortMap()) {
+		t.Fatal("explicit false must not shouldMap")
+	}
+	// absent enabled + maps via info other settings empty enabled nil but maps passed
+	info.ChannelOtherSettings = dto.ChannelOtherSettings{RequestFieldMaps: effortMap()}
+	if !ShouldApplyRequestFieldMaps(info, claude, effortMap()) {
+		t.Fatal("absent enabled + maps should shouldMap")
 	}
 }

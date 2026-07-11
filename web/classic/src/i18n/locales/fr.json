@@ -3686,12 +3686,11 @@
     "默认用户消息": "Bonjour",
     "默认补全倍率": "Taux de complétion par défaut"
   },
-  "请求字段映射": "Correspondances de champs de requête",
-  "将选定的 Claude 请求字段映射到转换后的 OpenAI 请求体。空列表=关闭。service_tier 映射需同时开启「允许 service_tier 透传」。": "Mappe les champs Claude selectionnes vers le corps OpenAI converti. Liste vide = desactive. Le mapping service_tier necessite aussi d autoriser le passthrough service_tier.",
-  "Claude → OpenAI": "Claude → OpenAI",
-  "effort → reasoning_effort": "effort → reasoning_effort",
-  "service_tier → service_tier": "service_tier → service_tier",
   "删除": "Supprimer",
-  "添加 effort 映射": "Ajouter le mapping effort",
-  "添加 service_tier 映射": "Ajouter le mapping service_tier"
+  "启用请求字段映射": "Activer les correspondances de champs",
+  "开启后才会在 Claude→OpenAI 转换时应用下方 JSON 映射；关闭则保留配置但不生效。": "Si active, applique le JSON ci-dessous pour Claude→OpenAI. Si desactive, conserve la config sans l appliquer.",
+  "请求字段映射 JSON": "JSON des correspondances de champs",
+  "JSON 数组，每项含 when/from/to。服务端仅接受白名单映射对。service_tier 映射需同时开启「允许 service_tier 透传」。": "Tableau JSON {when,from,to}. Seules les paires autorisees sont acceptees. service_tier necessite aussi le passthrough.",
+  "填入 effort 示例": "Inserer exemple effort",
+  "填入 effort+service_tier 示例": "Inserer effort+service_tier"
 }

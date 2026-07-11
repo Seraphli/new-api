@@ -3679,12 +3679,11 @@
     "默认用户消息": "你好",
     "默认补全倍率": "預設補全倍率"
   },
-  "请求字段映射": "請求欄位對應",
-  "将选定的 Claude 请求字段映射到转换后的 OpenAI 请求体。空列表=关闭。service_tier 映射需同时开启「允许 service_tier 透传」。": "將選定的 Claude 請求欄位對應到轉換後的 OpenAI 請求本體。空清單=關閉。service_tier 對應需同時開啟「允許 service_tier 透傳」。",
-  "Claude → OpenAI": "Claude → OpenAI",
-  "effort → reasoning_effort": "effort → reasoning_effort",
-  "service_tier → service_tier": "service_tier → service_tier",
   "删除": "刪除",
-  "添加 effort 映射": "新增 effort 對應",
-  "添加 service_tier 映射": "新增 service_tier 對應"
+  "启用请求字段映射": "啟用請求欄位對應",
+  "开启后才会在 Claude→OpenAI 转换时应用下方 JSON 映射；关闭则保留配置但不生效。": "開啟後才會在 Claude→OpenAI 轉換時套用下方 JSON 對應；關閉則保留設定但不生效。",
+  "请求字段映射 JSON": "請求欄位對應 JSON",
+  "JSON 数组，每项含 when/from/to。服务端仅接受白名单映射对。service_tier 映射需同时开启「允许 service_tier 透传」。": "JSON 陣列，每項含 when/from/to。伺服器僅接受白名單對應。service_tier 對應需同時開啟「允許 service_tier 透傳」。",
+  "填入 effort 示例": "填入 effort 範例",
+  "填入 effort+service_tier 示例": "填入 effort+service_tier 範例"
 }

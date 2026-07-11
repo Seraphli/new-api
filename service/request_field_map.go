@@ -11,9 +11,13 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-// ShouldApplyRequestFieldMaps is the single gate for Apply and Sync (plan r3 shouldMap).
+// ShouldApplyRequestFieldMaps is the single gate for Apply and Sync.
+// effectiveEnabled is taken from info.ChannelOtherSettings (same source as maps).
 func ShouldApplyRequestFieldMaps(info *relaycommon.RelayInfo, claude *dto.ClaudeRequest, maps []dto.RequestFieldMap) bool {
 	if info == nil || claude == nil || len(maps) == 0 {
+		return false
+	}
+	if !dto.EffectiveRequestFieldMapsEnabled(info.ChannelOtherSettings) {
 		return false
 	}
 	if model_setting.GetGlobalSettings().PassThroughRequestEnabled || info.ChannelSetting.PassThroughBodyEnabled {

@@ -5113,12 +5113,11 @@
     "No invite codes available. Generate your first invite codes to get started.": "暂无邀请码。生成第一批邀请码开始使用。",
     "invite code": "邀请码"
   },
-  "Request field maps": "请求字段映射",
-  "Map selected Claude request fields onto the converted OpenAI body. Empty list = disabled. service_tier mapping also needs allow service_tier on this channel.": "将选定的 Claude 请求字段映射到转换后的 OpenAI 请求体。空列表表示关闭。service_tier 映射还需在本渠道开启允许 service_tier 透传。",
-  "Claude → OpenAI": "Claude → OpenAI",
-  "effort → reasoning_effort": "effort → reasoning_effort",
-  "service_tier → service_tier": "service_tier → service_tier",
-  "Add effort map": "添加 effort 映射",
-  "Add service_tier map": "添加 service_tier 映射",
-  "Delete": "删除"
+  "Delete": "删除",
+  "Enable request field maps": "启用请求字段映射",
+  "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.": "开启后，在 Claude→OpenAI 转换时应用下方 JSON 映射；关闭则保留配置但不生效。",
+  "Request field maps JSON": "请求字段映射 JSON",
+  "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "JSON 数组，每项含 when/from/to。服务端仅接受白名单映射对。service_tier 映射还需在本渠道开启允许 service_tier 透传。",
+  "Fill effort example": "填入 effort 示例",
+  "Fill effort + service_tier example": "填入 effort+service_tier 示例"
 }
