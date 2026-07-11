@@ -168,6 +168,15 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 			return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
 		}
 
+		maps := info.ChannelOtherSettings.RequestFieldMaps
+		shouldMap := service.ShouldApplyRequestFieldMaps(info, request, maps)
+		if shouldMap {
+			jsonData, err = service.ApplyRequestFieldMaps(request, jsonData, maps)
+			if err != nil {
+				return types.NewError(err, types.ErrorCodeConvertRequestFailed, types.ErrOptionWithSkipRetry())
+			}
+		}
+
 		// remove disabled fields for Claude API
 		jsonData, err = relaycommon.RemoveDisabledFields(jsonData, info.ChannelOtherSettings, info.ChannelSetting.PassThroughBodyEnabled)
 		if err != nil {
@@ -180,6 +189,10 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 			if err != nil {
 				return newAPIErrorFromParamOverride(err)
 			}
+		}
+
+		if shouldMap {
+			service.SyncReasoningEffortFromFinalJSON(info, jsonData)
 		}
 
 		logger.LogDebug(c, "requestBody: %s", jsonData)

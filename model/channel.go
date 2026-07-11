@@ -962,9 +962,11 @@ func (channel *Channel) ValidateSettings() error {
 			return err
 		}
 	}
+	if err := dto.ValidateRequestFieldMaps(channelOtherSettings.RequestFieldMaps); err != nil {
+		return err
+	}
 	return nil
 }
-
 func (channel *Channel) GetSetting() dto.ChannelSettings {
 	setting := dto.ChannelSettings{}
 	if channel.Setting != nil && *channel.Setting != "" {

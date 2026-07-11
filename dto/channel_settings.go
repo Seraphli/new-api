@@ -49,6 +49,38 @@ type ChannelOtherSettings struct {
 	UpstreamModelUpdateLastRemovedModels  []string              `json:"upstream_model_update_last_removed_models,omitempty"`  // 上次检测到的可删除模型
 	UpstreamModelUpdateIgnoredModels      []string              `json:"upstream_model_update_ignored_models,omitempty"`       // 手动忽略的模型
 	AdvancedCustom                        *AdvancedCustomConfig `json:"advanced_custom,omitempty"`
+	// RequestFieldMaps maps Claude fields onto converted OpenAI JSON (per-channel).
+	// Empty means zero behavior change.
+	RequestFieldMaps []RequestFieldMap `json:"request_field_maps,omitempty"`
+}
+
+// RequestFieldMap is a single allowlisted Claude→OpenAI field mapping.
+type RequestFieldMap struct {
+	When string `json:"when,omitempty"`
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+const (
+	RequestFieldMapWhenClaudeToOpenAI = "claude_to_openai"
+	RequestFieldMapFromEffort         = "output_config.effort"
+	RequestFieldMapToReasoningEffort  = "reasoning_effort"
+)
+
+// ValidateRequestFieldMaps rejects non-allowlisted maps at channel save time.
+func ValidateRequestFieldMaps(maps []RequestFieldMap) error {
+	for i, m := range maps {
+		when := strings.TrimSpace(m.When)
+		if when != "" && when != RequestFieldMapWhenClaudeToOpenAI {
+			return fmt.Errorf("request_field_maps[%d]: when %q is not supported (allowed: empty or %q)", i, m.When, RequestFieldMapWhenClaudeToOpenAI)
+		}
+		from := strings.TrimSpace(m.From)
+		to := strings.TrimSpace(m.To)
+		if from != RequestFieldMapFromEffort || to != RequestFieldMapToReasoningEffort {
+			return fmt.Errorf("request_field_maps[%d]: only %q -> %q is allowed (got %q -> %q)", i, RequestFieldMapFromEffort, RequestFieldMapToReasoningEffort, m.From, m.To)
+		}
+	}
+	return nil
 }
 
 func (s *ChannelOtherSettings) IsOpenRouterEnterprise() bool {
