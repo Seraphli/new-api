@@ -178,6 +178,8 @@ export const channelFormSchema = z
       .optional()
       .refine(isOptionalJsonObject, ERROR_MESSAGES.INVALID_JSON),
     advanced_custom: z.string().optional(),
+    // Claude→OpenAI: map output_config.effort → reasoning_effort (stored in settings.request_field_maps)
+    map_effort_to_reasoning_effort: z.boolean().optional(),
     other: z.string().optional(),
     // Multi-key options (not sent to backend directly)
     multi_key_mode: z.enum(['single', 'batch', 'multi_to_single']).optional(),
@@ -349,6 +351,7 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   upstream_model_update_auto_sync_enabled: false,
   upstream_model_update_ignored_models: '',
   advanced_custom: '',
+  map_effort_to_reasoning_effort: false,
 }
 
 // ============================================================================
@@ -405,6 +408,7 @@ export function transformChannelToFormDefaults(
   let upstreamModelUpdateAutoSyncEnabled = false
   let upstreamModelUpdateIgnoredModels = ''
   let advancedCustom = ''
+  let mapEffortToReasoningEffort = false
 
   if (channel.settings) {
     try {
@@ -432,6 +436,15 @@ export function transformChannelToFormDefaults(
         : ''
       if (parsed.advanced_custom) {
         advancedCustom = stringifyAdvancedCustomConfig(parsed.advanced_custom)
+      }
+      const maps = parsed.request_field_maps
+      if (Array.isArray(maps)) {
+        mapEffortToReasoningEffort = maps.some(
+          (m: { from?: string; to?: string }) =>
+            m &&
+            m.from === 'output_config.effort' &&
+            m.to === 'reasoning_effort'
+        )
       }
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -484,6 +497,7 @@ export function transformChannelToFormDefaults(
     upstream_model_update_auto_sync_enabled: upstreamModelUpdateAutoSyncEnabled,
     upstream_model_update_ignored_models: upstreamModelUpdateIgnoredModels,
     advanced_custom: advancedCustom,
+    map_effort_to_reasoning_effort: mapEffortToReasoningEffort,
   }
 }
 
@@ -620,6 +634,19 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
     }
   } else if ('advanced_custom' in settingsObj) {
     delete settingsObj.advanced_custom
+  }
+
+  // Request field maps (OtherSettings): UI switch for effort → reasoning_effort
+  if (formData.map_effort_to_reasoning_effort === true) {
+    settingsObj.request_field_maps = [
+      {
+        when: 'claude_to_openai',
+        from: 'output_config.effort',
+        to: 'reasoning_effort',
+      },
+    ]
+  } else if ('request_field_maps' in settingsObj) {
+    delete settingsObj.request_field_maps
   }
 
   return JSON.stringify(settingsObj)

@@ -336,6 +336,7 @@ function hasAdvancedSettingsValues(values: ChannelFormValues): boolean {
     values.force_format ||
     values.thinking_to_content ||
     values.pass_through_body_enabled ||
+    values.map_effort_to_reasoning_effort ||
     values.system_prompt_override ||
     values.claude_beta_query ||
     values.upstream_model_update_check_enabled ||
@@ -4101,6 +4102,33 @@ export function ChannelMutateDrawer({
                                       <FormDescription>
                                         {t(
                                           'Pass request body directly to upstream'
+                                        )}
+                                      </FormDescription>
+                                    </div>
+                                    <FormControl>
+                                      <Switch
+                                        checked={field.value}
+                                        onCheckedChange={field.onChange}
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name='map_effort_to_reasoning_effort'
+                                render={({ field }) => (
+                                  <FormItem className='flex items-center justify-between px-4 py-3'>
+                                    <div className='space-y-0.5'>
+                                      <FormLabel>
+                                        {t(
+                                          'Map Claude effort to reasoning_effort'
+                                        )}
+                                      </FormLabel>
+                                      <FormDescription>
+                                        {t(
+                                          'When converting Claude Messages to OpenAI chat, copy output_config.effort into reasoning_effort for upstreams like CPA/Grok. Off = no mapping (safe for free channels).'
                                         )}
                                       </FormDescription>
                                     </div>

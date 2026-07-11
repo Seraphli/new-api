@@ -192,6 +192,7 @@ const EditChannelModal = (props) => {
     thinking_to_content: false,
     proxy: '',
     pass_through_body_enabled: false,
+    map_effort_to_reasoning_effort: false,
     system_prompt: '',
     system_prompt_override: false,
     settings: '',
@@ -514,6 +515,7 @@ const EditChannelModal = (props) => {
     thinking_to_content: false,
     proxy: '',
     pass_through_body_enabled: false,
+    map_effort_to_reasoning_effort: false,
     system_prompt: '',
   });
   const showApiConfigCard = true; // 控制是否显示 API 配置卡片
@@ -898,6 +900,17 @@ const EditChannelModal = (props) => {
           // 读取企业账户设置
           data.is_enterprise_account =
             parsedSettings.openrouter_enterprise === true;
+          {
+            const maps = parsedSettings.request_field_maps;
+            data.map_effort_to_reasoning_effort =
+              Array.isArray(maps) &&
+              maps.some(
+                (m) =>
+                  m &&
+                  m.from === 'output_config.effort' &&
+                  m.to === 'reasoning_effort',
+              );
+          }
           // 读取字段透传控制设置
           data.allow_service_tier = parsedSettings.allow_service_tier || false;
           data.disable_store = parsedSettings.disable_store || false;
@@ -1033,6 +1046,7 @@ const EditChannelModal = (props) => {
         (data.system_prompt && data.system_prompt.trim()) ||
         data.thinking_to_content ||
         data.pass_through_body_enabled ||
+        data.map_effort_to_reasoning_effort ||
         data.force_format ||
         data.claude_beta_query ||
         data.system_prompt_override;
@@ -1375,6 +1389,7 @@ const EditChannelModal = (props) => {
       thinking_to_content: false,
       proxy: '',
       pass_through_body_enabled: false,
+      map_effort_to_reasoning_effort: false,
       system_prompt: '',
       system_prompt_override: false,
     });
@@ -1823,6 +1838,18 @@ const EditChannelModal = (props) => {
       settings.upstream_model_update_last_check_time = 0;
     }
 
+    if (localInputs.map_effort_to_reasoning_effort === true) {
+      settings.request_field_maps = [
+        {
+          when: 'claude_to_openai',
+          from: 'output_config.effort',
+          to: 'reasoning_effort',
+        },
+      ];
+    } else if ('request_field_maps' in settings) {
+      delete settings.request_field_maps;
+    }
+
     localInputs.settings = JSON.stringify(settings);
 
     // 清理不需要发送到后端的字段
@@ -1830,6 +1857,7 @@ const EditChannelModal = (props) => {
     delete localInputs.thinking_to_content;
     delete localInputs.proxy;
     delete localInputs.pass_through_body_enabled;
+    delete localInputs.map_effort_to_reasoning_effort;
     delete localInputs.system_prompt;
     delete localInputs.system_prompt_override;
     delete localInputs.is_enterprise_account;
@@ -2522,6 +2550,7 @@ const EditChannelModal = (props) => {
 
                   <Form.Switch field='thinking_to_content' label={t('思考内容转换')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleChannelSettingsChange('thinking_to_content', value)} extraText={t('将 reasoning_content 转换为 <think> 标签拼接到内容中')} />
                   <Form.Switch field='pass_through_body_enabled' label={t('透传请求体')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleChannelSettingsChange('pass_through_body_enabled', value)} extraText={t('启用请求体透传功能')} />
+                  <Form.Switch field='map_effort_to_reasoning_effort' label={t('映射 Claude effort → reasoning_effort')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleInputChange('map_effort_to_reasoning_effort', value)} extraText={t('Claude Messages 转 OpenAI 时，将 output_config.effort 写入 reasoning_effort（CPA/Grok 等）。关闭则不映射，适合 free 渠道。')} />
 
                   <Form.Input field='proxy' label={t('代理地址')} placeholder={t('例如: socks5://user:pass@host:port')} onChange={(value) => handleChannelSettingsChange('proxy', value)} showClear extraText={t('用于配置网络代理，支持 socks5 协议')} />
 

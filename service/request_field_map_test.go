@@ -221,3 +221,19 @@ func TestShouldApplyOpenAIResponsesExcluded(t *testing.T) {
 		t.Fatal("OpenAI Responses final must not shouldMap")
 	}
 }
+
+func TestUISwitchShapeRequestFieldMaps(t *testing.T) {
+	// mirrors web UI writing request_field_maps when switch on
+	maps := []dto.RequestFieldMap{{
+		When: "claude_to_openai",
+		From: "output_config.effort",
+		To:   "reasoning_effort",
+	}}
+	if err := dto.ValidateRequestFieldMaps(maps); err != nil {
+		t.Fatal(err)
+	}
+	// switch off deletes maps - empty validates
+	if err := dto.ValidateRequestFieldMaps(nil); err != nil {
+		t.Fatal(err)
+	}
+}
