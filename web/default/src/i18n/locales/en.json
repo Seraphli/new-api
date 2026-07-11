@@ -5111,13 +5111,13 @@
     "Export selected codes as CSV": "导出选中的邀请码为 CSV",
     "Exported {{count}} invite codes": "已导出 {{count}} 个邀请码",
     "No invite codes available. Generate your first invite codes to get started.": "暂无邀请码。生成第一批邀请码开始使用。",
-    "invite code": "邀请码"
+    "invite code": "邀请码",
+    "Enable request field maps": "Enable request field maps",
+    "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.": "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.",
+    "Request field maps JSON": "Request field maps JSON",
+    "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.",
+    "Fill effort example": "Fill effort example",
+    "Fill effort + service_tier example": "Fill effort + service_tier example"
   },
-  "Delete": "Delete",
-  "Enable request field maps": "Enable request field maps",
-  "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.": "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.",
-  "Request field maps JSON": "Request field maps JSON",
-  "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.",
-  "Fill effort example": "Fill effort example",
-  "Fill effort + service_tier example": "Fill effort + service_tier example"
+  "Delete": "Delete"
 }

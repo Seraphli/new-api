@@ -5111,13 +5111,13 @@
     "Export selected codes as CSV": "导出选中的邀请码为 CSV",
     "Exported {{count}} invite codes": "已导出 {{count}} 个邀请码",
     "No invite codes available. Generate your first invite codes to get started.": "暂无邀请码。生成第一批邀请码开始使用。",
-    "invite code": "邀请码"
+    "invite code": "邀请码",
+    "Enable request field maps": "Bật ánh xạ trường yêu cầu",
+    "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.": "Bật thì áp dụng JSON bên dưới khi chuyển Claude→OpenAI. Tắt thì giữ cấu hình nhưng không áp dụng.",
+    "Request field maps JSON": "JSON ánh xạ trường yêu cầu",
+    "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "Mảng JSON {when,from,to}. Máy chủ chỉ chấp nhận cặp trong allowlist. service_tier cũng cần bật cho phép service_tier trên kênh.",
+    "Fill effort example": "Điền ví dụ effort",
+    "Fill effort + service_tier example": "Điền ví dụ effort+service_tier"
   },
-  "Delete": "Xóa",
-  "Enable request field maps": "Bật ánh xạ trường yêu cầu",
-  "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.": "Bật thì áp dụng JSON bên dưới khi chuyển Claude→OpenAI. Tắt thì giữ cấu hình nhưng không áp dụng.",
-  "Request field maps JSON": "JSON ánh xạ trường yêu cầu",
-  "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "Mảng JSON {when,from,to}. Máy chủ chỉ chấp nhận cặp trong allowlist. service_tier cũng cần bật cho phép service_tier trên kênh.",
-  "Fill effort example": "Điền ví dụ effort",
-  "Fill effort + service_tier example": "Điền ví dụ effort+service_tier"
+  "Delete": "Xóa"
 }

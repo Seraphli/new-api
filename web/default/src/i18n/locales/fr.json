@@ -5111,13 +5111,13 @@
     "Export selected codes as CSV": "导出选中的邀请码为 CSV",
     "Exported {{count}} invite codes": "已导出 {{count}} 个邀请码",
     "No invite codes available. Generate your first invite codes to get started.": "暂无邀请码。生成第一批邀请码开始使用。",
-    "invite code": "邀请码"
+    "invite code": "邀请码",
+    "Enable request field maps": "Activer les correspondances de champs",
+    "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.": "Si activé, applique les correspondances JSON ci-dessous lors de la conversion Claude→OpenAI. Si désactivé, la config est conservée mais non appliquée.",
+    "Request field maps JSON": "JSON des correspondances de champs",
+    "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "Tableau JSON {when,from,to}. Seules les paires autorisées sont acceptées. service_tier nécessite aussi d autoriser service_tier sur ce canal.",
+    "Fill effort example": "Insérer exemple effort",
+    "Fill effort + service_tier example": "Insérer exemple effort + service_tier"
   },
-  "Delete": "Supprimer",
-  "Enable request field maps": "Activer les correspondances de champs",
-  "When on, apply the JSON maps below on Claude→OpenAI conversion. When off, maps are kept but not applied.": "Si activé, applique les correspondances JSON ci-dessous lors de la conversion Claude→OpenAI. Si désactivé, la config est conservée mais non appliquée.",
-  "Request field maps JSON": "JSON des correspondances de champs",
-  "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "Tableau JSON {when,from,to}. Seules les paires autorisées sont acceptées. service_tier nécessite aussi d autoriser service_tier sur ce canal.",
-  "Fill effort example": "Insérer exemple effort",
-  "Fill effort + service_tier example": "Insérer exemple effort + service_tier"
+  "Delete": "Supprimer"
 }
