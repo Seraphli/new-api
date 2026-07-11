@@ -2631,5 +2631,13 @@
     "运营和收费行为产生的法律责任": "运营和收费行为产生的法律责任",
     "，": "，",
     "、": "、"
-  }
+  },
+  "请求字段映射": "请求字段映射",
+  "将选定的 Claude 请求字段映射到转换后的 OpenAI 请求体。空列表=关闭。service_tier 映射需同时开启「允许 service_tier 透传」。": "将选定的 Claude 请求字段映射到转换后的 OpenAI 请求体。空列表=关闭。service_tier 映射需同时开启「允许 service_tier 透传」。",
+  "Claude → OpenAI": "Claude → OpenAI",
+  "effort → reasoning_effort": "effort → reasoning_effort",
+  "service_tier → service_tier": "service_tier → service_tier",
+  "删除": "删除",
+  "添加 effort 映射": "添加 effort 映射",
+  "添加 service_tier 映射": "添加 service_tier 映射"
 }

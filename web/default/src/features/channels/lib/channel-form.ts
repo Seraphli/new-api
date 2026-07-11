@@ -178,8 +178,16 @@ export const channelFormSchema = z
       .optional()
       .refine(isOptionalJsonObject, ERROR_MESSAGES.INVALID_JSON),
     advanced_custom: z.string().optional(),
-    // Claude→OpenAI: map output_config.effort → reasoning_effort (stored in settings.request_field_maps)
-    map_effort_to_reasoning_effort: z.boolean().optional(),
+    // Claude→OpenAI allowlisted maps (stored in settings.request_field_maps)
+    request_field_maps: z
+      .array(
+        z.object({
+          when: z.string().optional(),
+          from: z.string(),
+          to: z.string(),
+        })
+      )
+      .optional(),
     other: z.string().optional(),
     // Multi-key options (not sent to backend directly)
     multi_key_mode: z.enum(['single', 'batch', 'multi_to_single']).optional(),
@@ -351,7 +359,7 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   upstream_model_update_auto_sync_enabled: false,
   upstream_model_update_ignored_models: '',
   advanced_custom: '',
-  map_effort_to_reasoning_effort: false,
+  request_field_maps: [],
 }
 
 // ============================================================================
@@ -408,7 +416,11 @@ export function transformChannelToFormDefaults(
   let upstreamModelUpdateAutoSyncEnabled = false
   let upstreamModelUpdateIgnoredModels = ''
   let advancedCustom = ''
-  let mapEffortToReasoningEffort = false
+  let requestFieldMaps: {
+    when?: string
+    from: string
+    to: string
+  }[] = []
 
   if (channel.settings) {
     try {
@@ -439,12 +451,19 @@ export function transformChannelToFormDefaults(
       }
       const maps = parsed.request_field_maps
       if (Array.isArray(maps)) {
-        mapEffortToReasoningEffort = maps.some(
-          (m: { from?: string; to?: string }) =>
-            m &&
-            m.from === 'output_config.effort' &&
-            m.to === 'reasoning_effort'
-        )
+        requestFieldMaps = maps
+          .filter(
+            (m: { from?: string; to?: string }) =>
+              m && typeof m.from === 'string' && typeof m.to === 'string'
+          )
+          .map((m: { when?: string; from: string; to: string }) => ({
+            when:
+              !m.when || String(m.when).trim() === ''
+                ? 'claude_to_openai'
+                : String(m.when).trim(),
+            from: String(m.from).trim(),
+            to: String(m.to).trim(),
+          }))
       }
     } catch (error) {
       // eslint-disable-next-line no-console
@@ -497,7 +516,7 @@ export function transformChannelToFormDefaults(
     upstream_model_update_auto_sync_enabled: upstreamModelUpdateAutoSyncEnabled,
     upstream_model_update_ignored_models: upstreamModelUpdateIgnoredModels,
     advanced_custom: advancedCustom,
-    map_effort_to_reasoning_effort: mapEffortToReasoningEffort,
+    request_field_maps: requestFieldMaps,
   }
 }
 
@@ -519,7 +538,7 @@ function buildSettingJSON(formData: ChannelFormValues): string {
 /**
  * Build the settings JSON string (for type-specific config like vertex_key_type)
  */
-function buildSettingsJSON(formData: ChannelFormValues): string {
+export function buildSettingsJSON(formData: ChannelFormValues): string {
   let settingsObj: Record<string, unknown> = {}
 
   // Try to parse existing settings first
@@ -636,17 +655,33 @@ function buildSettingsJSON(formData: ChannelFormValues): string {
     delete settingsObj.advanced_custom
   }
 
-  // Request field maps (OtherSettings): UI switch for effort → reasoning_effort
-  if (formData.map_effort_to_reasoning_effort === true) {
-    settingsObj.request_field_maps = [
-      {
-        when: 'claude_to_openai',
-        from: 'output_config.effort',
-        to: 'reasoning_effort',
-      },
-    ]
-  } else if ('request_field_maps' in settingsObj) {
-    delete settingsObj.request_field_maps
+  // Request field maps (OtherSettings): multi-row allowlisted editor
+  {
+    const rows = Array.isArray(formData.request_field_maps)
+      ? formData.request_field_maps
+      : []
+    const cleaned = rows
+      .filter(
+        (m) =>
+          m &&
+          typeof m.from === 'string' &&
+          typeof m.to === 'string' &&
+          m.from.trim() !== '' &&
+          m.to.trim() !== ''
+      )
+      .map((m) => ({
+        when:
+          !m.when || String(m.when).trim() === ''
+            ? 'claude_to_openai'
+            : String(m.when).trim(),
+        from: String(m.from).trim(),
+        to: String(m.to).trim(),
+      }))
+    if (cleaned.length > 0) {
+      settingsObj.request_field_maps = cleaned
+    } else if ('request_field_maps' in settingsObj) {
+      delete settingsObj.request_field_maps
+    }
   }
 
   return JSON.stringify(settingsObj)
@@ -825,4 +860,61 @@ export function formatModels(models: string[]): string {
  */
 export function formatGroups(groups: string[]): string {
   return groups.join(',')
+}
+
+
+// ============================================================================
+// Request field map allowlist (UI + serializer)
+// ============================================================================
+
+export const REQUEST_FIELD_MAP_WHEN_OPTIONS = [
+  { value: 'claude_to_openai', labelKey: 'Claude → OpenAI' },
+] as const
+
+export const REQUEST_FIELD_MAP_PAIR_OPTIONS = [
+  {
+    id: 'P1',
+    from: 'output_config.effort',
+    to: 'reasoning_effort',
+    labelKey: 'effort → reasoning_effort',
+  },
+  {
+    id: 'P2',
+    from: 'service_tier',
+    to: 'service_tier',
+    labelKey: 'service_tier → service_tier',
+  },
+] as const
+
+export type RequestFieldMapRow = {
+  when?: string
+  from: string
+  to: string
+}
+
+export function validateRequestFieldMapsClient(
+  maps: RequestFieldMapRow[] | undefined
+): string | null {
+  if (!maps || maps.length === 0) return null
+  const allowed = new Set(
+    REQUEST_FIELD_MAP_PAIR_OPTIONS.map((p) => `${p.from}=>${p.to}`)
+  )
+  const seenTo = new Set<string>()
+  for (let i = 0; i < maps.length; i++) {
+    const m = maps[i]
+    const when = (m.when || '').trim()
+    if (when && when !== 'claude_to_openai') {
+      return `request_field_maps[${i}]: unsupported when`
+    }
+    const pair = `${(m.from || '').trim()}=>${(m.to || '').trim()}`
+    if (!allowed.has(pair)) {
+      return `request_field_maps[${i}]: pair not allowlisted`
+    }
+    const to = (m.to || '').trim()
+    if (seenTo.has(to)) {
+      return `request_field_maps[${i}]: duplicate to ${to}`
+    }
+    seenTo.add(to)
+  }
+  return null
 }

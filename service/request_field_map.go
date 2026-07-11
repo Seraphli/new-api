@@ -39,15 +39,23 @@ func ApplyRequestFieldMaps(claude *dto.ClaudeRequest, openAIJSON []byte, maps []
 		}
 		from := strings.TrimSpace(m.From)
 		to := strings.TrimSpace(m.To)
-		if from != dto.RequestFieldMapFromEffort || to != dto.RequestFieldMapToReasoningEffort {
+		if !dto.IsAllowedRequestFieldMapPair(from, to) {
 			continue
 		}
-		val := claude.GetEfforts()
+		var val string
+		switch from {
+		case dto.RequestFieldMapFromEffort:
+			val = claude.GetEfforts()
+		case dto.RequestFieldMapFromServiceTier:
+			val = strings.TrimSpace(claude.ServiceTier)
+		default:
+			continue
+		}
 		if val == "" {
 			continue
 		}
 		var err error
-		out, err = sjson.SetBytes(out, dto.RequestFieldMapToReasoningEffort, val)
+		out, err = sjson.SetBytes(out, to, val)
 		if err != nil {
 			return nil, err
 		}

@@ -967,6 +967,20 @@ func (channel *Channel) ValidateSettings() error {
 	}
 	return nil
 }
+
+// CanonicalizeRequestFieldMapsInOtherSettings rewrites empty when in OtherSettings
+// JSON only (merge-safe). Call after ValidateSettings, before persist.
+func (channel *Channel) CanonicalizeRequestFieldMapsInOtherSettings() error {
+	if channel == nil {
+		return nil
+	}
+	next, err := dto.CanonicalizeOtherSettingsJSON(channel.OtherSettings)
+	if err != nil {
+		return err
+	}
+	channel.OtherSettings = next
+	return nil
+}
 func (channel *Channel) GetSetting() dto.ChannelSettings {
 	setting := dto.ChannelSettings{}
 	if channel.Setting != nil && *channel.Setting != "" {

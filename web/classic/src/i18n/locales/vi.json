@@ -4219,5 +4219,13 @@
     "默认测试模型": "Mô hình kiểm tra mặc định",
     "默认用户消息": "Xin chào",
     "默认补全倍率": "Tỷ lệ hoàn thành mặc định"
-  }
+  },
+  "请求字段映射": "Ánh xạ trường yêu cầu",
+  "将选定的 Claude 请求字段映射到转换后的 OpenAI 请求体。空列表=关闭。service_tier 映射需同时开启「允许 service_tier 透传」。": "Ánh xạ các trường Claude đã chọn sang thân OpenAI. Danh sách trống = tắt. Ánh xạ service_tier cũng cần bật cho phép passthrough service_tier.",
+  "Claude → OpenAI": "Claude → OpenAI",
+  "effort → reasoning_effort": "effort → reasoning_effort",
+  "service_tier → service_tier": "service_tier → service_tier",
+  "删除": "Xóa",
+  "添加 effort 映射": "Thêm map effort",
+  "添加 service_tier 映射": "Thêm map service_tier"
 }

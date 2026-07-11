@@ -3654,5 +3654,13 @@
     "默认测试模型": "デフォルトテストモデル",
     "默认用户消息": "こんにちは",
     "默认补全倍率": "デフォルト補完倍率"
-  }
+  },
+  "请求字段映射": "リクエストフィールドマップ",
+  "将选定的 Claude 请求字段映射到转换后的 OpenAI 请求体。空列表=关闭。service_tier 映射需同时开启「允许 service_tier 透传」。": "選択した Claude リクエストフィールドを変換後の OpenAI ボディへマップします。空リスト=無効。service_tier マップには service_tier 透過許可も必要です。",
+  "Claude → OpenAI": "Claude → OpenAI",
+  "effort → reasoning_effort": "effort → reasoning_effort",
+  "service_tier → service_tier": "service_tier → service_tier",
+  "删除": "削除",
+  "添加 effort 映射": "effort マップを追加",
+  "添加 service_tier 映射": "service_tier マップを追加"
 }

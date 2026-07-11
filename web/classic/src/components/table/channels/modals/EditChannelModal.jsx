@@ -73,6 +73,7 @@ import {
   collectNewDisallowedStatusCodeRedirects,
 } from './statusCodeRiskGuard';
 import {
+import { loadRequestFieldMaps, saveRequestFieldMaps } from '../../../../helpers/requestFieldMaps';
   IconSave,
   IconClose,
   IconServer,
@@ -192,7 +193,7 @@ const EditChannelModal = (props) => {
     thinking_to_content: false,
     proxy: '',
     pass_through_body_enabled: false,
-    map_effort_to_reasoning_effort: false,
+    request_field_maps: [],
     system_prompt: '',
     system_prompt_override: false,
     settings: '',
@@ -515,7 +516,7 @@ const EditChannelModal = (props) => {
     thinking_to_content: false,
     proxy: '',
     pass_through_body_enabled: false,
-    map_effort_to_reasoning_effort: false,
+    request_field_maps: [],
     system_prompt: '',
   });
   const showApiConfigCard = true; // 控制是否显示 API 配置卡片
@@ -901,15 +902,7 @@ const EditChannelModal = (props) => {
           data.is_enterprise_account =
             parsedSettings.openrouter_enterprise === true;
           {
-            const maps = parsedSettings.request_field_maps;
-            data.map_effort_to_reasoning_effort =
-              Array.isArray(maps) &&
-              maps.some(
-                (m) =>
-                  m &&
-                  m.from === 'output_config.effort' &&
-                  m.to === 'reasoning_effort',
-              );
+            data.request_field_maps = loadRequestFieldMaps(parsedSettings);
           }
           // 读取字段透传控制设置
           data.allow_service_tier = parsedSettings.allow_service_tier || false;
@@ -1046,7 +1039,7 @@ const EditChannelModal = (props) => {
         (data.system_prompt && data.system_prompt.trim()) ||
         data.thinking_to_content ||
         data.pass_through_body_enabled ||
-        data.map_effort_to_reasoning_effort ||
+        (Array.isArray(data.request_field_maps) && data.request_field_maps.length > 0) ||
         data.force_format ||
         data.claude_beta_query ||
         data.system_prompt_override;
@@ -1389,7 +1382,7 @@ const EditChannelModal = (props) => {
       thinking_to_content: false,
       proxy: '',
       pass_through_body_enabled: false,
-      map_effort_to_reasoning_effort: false,
+      request_field_maps: [],
       system_prompt: '',
       system_prompt_override: false,
     });
@@ -1838,17 +1831,7 @@ const EditChannelModal = (props) => {
       settings.upstream_model_update_last_check_time = 0;
     }
 
-    if (localInputs.map_effort_to_reasoning_effort === true) {
-      settings.request_field_maps = [
-        {
-          when: 'claude_to_openai',
-          from: 'output_config.effort',
-          to: 'reasoning_effort',
-        },
-      ];
-    } else if ('request_field_maps' in settings) {
-      delete settings.request_field_maps;
-    }
+    saveRequestFieldMaps(settings, localInputs.request_field_maps);
 
     localInputs.settings = JSON.stringify(settings);
 
@@ -1857,7 +1840,7 @@ const EditChannelModal = (props) => {
     delete localInputs.thinking_to_content;
     delete localInputs.proxy;
     delete localInputs.pass_through_body_enabled;
-    delete localInputs.map_effort_to_reasoning_effort;
+    delete localInputs.request_field_maps;
     delete localInputs.system_prompt;
     delete localInputs.system_prompt_override;
     delete localInputs.is_enterprise_account;
@@ -2550,7 +2533,82 @@ const EditChannelModal = (props) => {
 
                   <Form.Switch field='thinking_to_content' label={t('思考内容转换')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleChannelSettingsChange('thinking_to_content', value)} extraText={t('将 reasoning_content 转换为 <think> 标签拼接到内容中')} />
                   <Form.Switch field='pass_through_body_enabled' label={t('透传请求体')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleChannelSettingsChange('pass_through_body_enabled', value)} extraText={t('启用请求体透传功能')} />
-                  <Form.Switch field='map_effort_to_reasoning_effort' label={t('映射 Claude effort → reasoning_effort')} checkedText={t('开')} uncheckedText={t('关')} onChange={(value) => handleInputChange('map_effort_to_reasoning_effort', value)} extraText={t('Claude Messages 转 OpenAI 时，将 output_config.effort 写入 reasoning_effort（CPA/Grok 等）。关闭则不映射，适合 free 渠道。')} />
+                  <div className='mb-3'>
+                    <Text className='text-sm font-medium text-gray-700 mb-1 block'>
+                      {t('请求字段映射')}
+                    </Text>
+                    <Text className='text-xs text-gray-500 mb-2 block'>
+                      {t('将选定的 Claude 请求字段映射到转换后的 OpenAI 请求体。空列表=关闭。service_tier 映射需同时开启「允许 service_tier 透传」。')}
+                    </Text>
+                    {(Array.isArray(inputs.request_field_maps) ? inputs.request_field_maps : []).map((row, index) => (
+                      <div key={`${row.from}-${row.to}-${index}`} className='flex flex-wrap gap-2 items-center mb-2'>
+                        <select
+                          className='border rounded px-2 py-1 text-sm'
+                          value={row.when || 'claude_to_openai'}
+                          onChange={(e) => {
+                            const next = [...(inputs.request_field_maps || [])];
+                            next[index] = { ...next[index], when: e.target.value };
+                            handleInputChange('request_field_maps', next);
+                          }}
+                        >
+                          <option value='claude_to_openai'>{t('Claude → OpenAI')}</option>
+                        </select>
+                        <select
+                          className='border rounded px-2 py-1 text-sm flex-1'
+                          value={`${row.from}=>${row.to}`}
+                          onChange={(e) => {
+                            const [from, to] = e.target.value.split('=>');
+                            const next = [...(inputs.request_field_maps || [])];
+                            next[index] = { ...next[index], from, to };
+                            handleInputChange('request_field_maps', next);
+                          }}
+                        >
+                          <option value='output_config.effort=>reasoning_effort'>{t('effort → reasoning_effort')}</option>
+                          <option value='service_tier=>service_tier'>{t('service_tier → service_tier')}</option>
+                        </select>
+                        <button
+                          type='button'
+                          className='border rounded px-2 py-1 text-sm'
+                          onClick={() => {
+                            const next = (inputs.request_field_maps || []).filter((_, i) => i !== index);
+                            handleInputChange('request_field_maps', next);
+                          }}
+                        >
+                          {t('删除')}
+                        </button>
+                      </div>
+                    ))}
+                    <div className='flex flex-wrap gap-2'>
+                      <button
+                        type='button'
+                        className='border rounded px-2 py-1 text-sm'
+                        onClick={() => {
+                          const rows = Array.isArray(inputs.request_field_maps) ? inputs.request_field_maps : [];
+                          if (rows.some((r) => r && r.to === 'reasoning_effort')) return;
+                          handleInputChange('request_field_maps', [
+                            ...rows,
+                            { when: 'claude_to_openai', from: 'output_config.effort', to: 'reasoning_effort' },
+                          ]);
+                        }}
+                      >
+                        {t('添加 effort 映射')}
+                      </button>
+                      <button
+                        type='button'
+                        className='border rounded px-2 py-1 text-sm'
+                        onClick={() => {
+                          const rows = Array.isArray(inputs.request_field_maps) ? inputs.request_field_maps : [];
+                          if (rows.some((r) => r && r.to === 'service_tier')) return;
+                          handleInputChange('request_field_maps', [
+                            ...rows,
+                            { when: 'claude_to_openai', from: 'service_tier', to: 'service_tier' },
+                          ]);
+                        }}
+                      >
+                        {t('添加 service_tier 映射')}
+                      </button>
+                    </div>
+                  </div>
 
                   <Form.Input field='proxy' label={t('代理地址')} placeholder={t('例如: socks5://user:pass@host:port')} onChange={(value) => handleChannelSettingsChange('proxy', value)} showClear extraText={t('用于配置网络代理，支持 socks5 协议')} />
 

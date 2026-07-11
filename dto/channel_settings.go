@@ -1,6 +1,7 @@
 package dto
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"strings"
@@ -65,10 +66,80 @@ const (
 	RequestFieldMapWhenClaudeToOpenAI = "claude_to_openai"
 	RequestFieldMapFromEffort         = "output_config.effort"
 	RequestFieldMapToReasoningEffort  = "reasoning_effort"
+	RequestFieldMapFromServiceTier    = "service_tier"
+	RequestFieldMapToServiceTier      = "service_tier"
 )
 
-// ValidateRequestFieldMaps rejects non-allowlisted maps at channel save time.
+// IsAllowedRequestFieldMapPair reports whether (from,to) is an allowlisted pair.
+func IsAllowedRequestFieldMapPair(from, to string) bool {
+	from = strings.TrimSpace(from)
+	to = strings.TrimSpace(to)
+	if from == RequestFieldMapFromEffort && to == RequestFieldMapToReasoningEffort {
+		return true
+	}
+	if from == RequestFieldMapFromServiceTier && to == RequestFieldMapToServiceTier {
+		return true
+	}
+	return false
+}
+
+// CanonicalizeRequestFieldMaps sets empty when to claude_to_openai; keeps from/to.
+func CanonicalizeRequestFieldMaps(maps []RequestFieldMap) []RequestFieldMap {
+	if len(maps) == 0 {
+		return maps
+	}
+	out := make([]RequestFieldMap, len(maps))
+	for i, m := range maps {
+		out[i] = m
+		if strings.TrimSpace(m.When) == "" {
+			out[i].When = RequestFieldMapWhenClaudeToOpenAI
+		} else {
+			out[i].When = strings.TrimSpace(m.When)
+		}
+		out[i].From = strings.TrimSpace(m.From)
+		out[i].To = strings.TrimSpace(m.To)
+	}
+	return out
+}
+
+// CanonicalizeOtherSettingsJSON rewrites request_field_maps when values only
+// (merge-safe: preserves advanced_custom and unknown keys).
+func CanonicalizeOtherSettingsJSON(otherSettings string) (string, error) {
+	trimmed := strings.TrimSpace(otherSettings)
+	if trimmed == "" || trimmed == "{}" {
+		return otherSettings, nil
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(trimmed), &raw); err != nil {
+		return "", err
+	}
+	mapsRaw, ok := raw["request_field_maps"]
+	if !ok || len(mapsRaw) == 0 || string(mapsRaw) == "null" {
+		return otherSettings, nil
+	}
+	var maps []RequestFieldMap
+	if err := json.Unmarshal(mapsRaw, &maps); err != nil {
+		return "", err
+	}
+	if len(maps) == 0 {
+		return otherSettings, nil
+	}
+	canonical := CanonicalizeRequestFieldMaps(maps)
+	encoded, err := json.Marshal(canonical)
+	if err != nil {
+		return "", err
+	}
+	raw["request_field_maps"] = encoded
+	out, err := json.Marshal(raw)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
+}
+
+// ValidateRequestFieldMaps rejects non-allowlisted maps and duplicate destinations.
 func ValidateRequestFieldMaps(maps []RequestFieldMap) error {
+	seenTo := make(map[string]int, len(maps))
 	for i, m := range maps {
 		when := strings.TrimSpace(m.When)
 		if when != "" && when != RequestFieldMapWhenClaudeToOpenAI {
@@ -76,9 +147,13 @@ func ValidateRequestFieldMaps(maps []RequestFieldMap) error {
 		}
 		from := strings.TrimSpace(m.From)
 		to := strings.TrimSpace(m.To)
-		if from != RequestFieldMapFromEffort || to != RequestFieldMapToReasoningEffort {
-			return fmt.Errorf("request_field_maps[%d]: only %q -> %q is allowed (got %q -> %q)", i, RequestFieldMapFromEffort, RequestFieldMapToReasoningEffort, m.From, m.To)
+		if !IsAllowedRequestFieldMapPair(from, to) {
+			return fmt.Errorf("request_field_maps[%d]: pair %q -> %q is not allowlisted", i, m.From, m.To)
 		}
+		if prev, ok := seenTo[to]; ok {
+			return fmt.Errorf("request_field_maps[%d]: duplicate to %q (also at index %d)", i, to, prev)
+		}
+		seenTo[to] = i
 	}
 	return nil
 }

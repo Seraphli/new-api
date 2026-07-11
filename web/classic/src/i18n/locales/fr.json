@@ -3685,5 +3685,13 @@
     "默认测试模型": "Modèle de test par défaut",
     "默认用户消息": "Bonjour",
     "默认补全倍率": "Taux de complétion par défaut"
-  }
+  },
+  "请求字段映射": "Correspondances de champs de requête",
+  "将选定的 Claude 请求字段映射到转换后的 OpenAI 请求体。空列表=关闭。service_tier 映射需同时开启「允许 service_tier 透传」。": "Mappe les champs Claude selectionnes vers le corps OpenAI converti. Liste vide = desactive. Le mapping service_tier necessite aussi d autoriser le passthrough service_tier.",
+  "Claude → OpenAI": "Claude → OpenAI",
+  "effort → reasoning_effort": "effort → reasoning_effort",
+  "service_tier → service_tier": "service_tier → service_tier",
+  "删除": "Supprimer",
+  "添加 effort 映射": "Ajouter le mapping effort",
+  "添加 service_tier 映射": "Ajouter le mapping service_tier"
 }

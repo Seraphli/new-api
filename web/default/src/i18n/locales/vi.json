@@ -1999,7 +1999,7 @@
     "footer.columns.related.links.oneApi": "One API",
     "footer.columns.related.title": "Các Dự Án Liên Quan",
     "footer.defaultCopyright": "Bản quyền được bảo lưu.",
-    "footer.new\u0061pi.projectAttributionSuffix": "Bản quyền được bảo lưu. Được thiết kế và phát triển bởi các cộng tác viên dự án.",
+    "footer.newapi.projectAttributionSuffix": "Bản quyền được bảo lưu. Được thiết kế và phát triển bởi các cộng tác viên dự án.",
     "For channels added after May 10, 2025, no need to remove \".\" from model names during deployment": "Đối với các kênh được thêm sau ngày 10 tháng 5 năm 2025, không cần loại bỏ \".\" khỏi tên mô hình trong quá trình triển khai",
     "For private deployments, format: https://fastgpt.run/api/openapi": "Đối với các triển khai riêng tư, định dạng: https://fastgpt.run/api/openapi",
     "Force a syntactically valid JSON response": "Buộc phản hồi JSON hợp lệ về cú pháp",
@@ -5112,5 +5112,13 @@
     "Exported {{count}} invite codes": "已导出 {{count}} 个邀请码",
     "No invite codes available. Generate your first invite codes to get started.": "暂无邀请码。生成第一批邀请码开始使用。",
     "invite code": "邀请码"
-  }
+  },
+  "Request field maps": "Ánh xạ trường yêu cầu",
+  "Map selected Claude request fields onto the converted OpenAI body. Empty list = disabled. service_tier mapping also needs allow service_tier on this channel.": "Ánh xạ các trường Claude đã chọn sang thân OpenAI đã chuyển đổi. Danh sách trống = tắt. Ánh xạ service_tier cũng cần bật cho phép service_tier trên kênh này.",
+  "Claude → OpenAI": "Claude → OpenAI",
+  "effort → reasoning_effort": "effort → reasoning_effort",
+  "service_tier → service_tier": "service_tier → service_tier",
+  "Add effort map": "Thêm map effort",
+  "Add service_tier map": "Thêm map service_tier",
+  "Delete": "Xóa"
 }

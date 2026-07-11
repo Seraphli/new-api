@@ -1999,7 +1999,7 @@
     "footer.columns.related.links.oneApi": "Один API",
     "footer.columns.related.title": "Связанные проекты",
     "footer.defaultCopyright": "Все права защищены.",
-    "footer.new\u0061pi.projectAttributionSuffix": "Все права защищены. Разработано участниками проекта.",
+    "footer.newapi.projectAttributionSuffix": "Все права защищены. Разработано участниками проекта.",
     "For channels added after May 10, 2025, no need to remove \".\" from model names during deployment": "Для каналов, добавленных после 10 мая 2025 г., не нужно удалять \".\" из имён моделей при развёртывании",
     "For private deployments, format: https://fastgpt.run/api/openapi": "Для частных развертываний, формат: https://fastgpt.run/api/openapi",
     "Force a syntactically valid JSON response": "Принудительно возвращать синтаксически корректный JSON",
@@ -5112,5 +5112,13 @@
     "Exported {{count}} invite codes": "已导出 {{count}} 个邀请码",
     "No invite codes available. Generate your first invite codes to get started.": "暂无邀请码。生成第一批邀请码开始使用。",
     "invite code": "邀请码"
-  }
+  },
+  "Request field maps": "Сопоставление полей запроса",
+  "Map selected Claude request fields onto the converted OpenAI body. Empty list = disabled. service_tier mapping also needs allow service_tier on this channel.": "Сопоставляет выбранные поля запроса Claude с преобразованным телом OpenAI. Пустой список = выкл. Для service_tier также нужно разрешить service_tier на канале.",
+  "Claude → OpenAI": "Claude → OpenAI",
+  "effort → reasoning_effort": "effort → reasoning_effort",
+  "service_tier → service_tier": "service_tier → service_tier",
+  "Add effort map": "Добавить map effort",
+  "Add service_tier map": "Добавить map service_tier",
+  "Delete": "Удалить"
 }

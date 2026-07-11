@@ -1999,7 +1999,7 @@
     "footer.columns.related.links.oneApi": "One API",
     "footer.columns.related.title": "Related Projects",
     "footer.defaultCopyright": "All rights reserved.",
-    "footer.new\u0061pi.projectAttributionSuffix": "All rights reserved. Designed and developed by the project contributors.",
+    "footer.newapi.projectAttributionSuffix": "All rights reserved. Designed and developed by the project contributors.",
     "For channels added after May 10, 2025, no need to remove \".\" from model names during deployment": "For channels added after May 10, 2025, no need to remove \".\" from model names during deployment",
     "For private deployments, format: https://fastgpt.run/api/openapi": "For private deployments, format: https://fastgpt.run/api/openapi",
     "Force a syntactically valid JSON response": "Force a syntactically valid JSON response",
@@ -5112,5 +5112,13 @@
     "Exported {{count}} invite codes": "已导出 {{count}} 个邀请码",
     "No invite codes available. Generate your first invite codes to get started.": "暂无邀请码。生成第一批邀请码开始使用。",
     "invite code": "邀请码"
-  }
+  },
+  "Request field maps": "Request field maps",
+  "Map selected Claude request fields onto the converted OpenAI body. Empty list = disabled. service_tier mapping also needs allow service_tier on this channel.": "Map selected Claude request fields onto the converted OpenAI body. Empty list = disabled. service_tier mapping also needs allow service_tier on this channel.",
+  "Claude → OpenAI": "Claude → OpenAI",
+  "effort → reasoning_effort": "effort → reasoning_effort",
+  "service_tier → service_tier": "service_tier → service_tier",
+  "Add effort map": "Add effort map",
+  "Add service_tier map": "Add service_tier map",
+  "Delete": "Delete"
 }

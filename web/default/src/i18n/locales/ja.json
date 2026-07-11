@@ -1999,7 +1999,7 @@
     "footer.columns.related.links.oneApi": "1つのAPI",
     "footer.columns.related.title": "関連プロジェクト",
     "footer.defaultCopyright": "すべての権利を留保します。",
-    "footer.new\u0061pi.projectAttributionSuffix": "すべての権利を留保します。プロジェクトコントリビューターにより設計・開発されています。",
+    "footer.newapi.projectAttributionSuffix": "すべての権利を留保します。プロジェクトコントリビューターにより設計・開発されています。",
     "For channels added after May 10, 2025, no need to remove \".\" from model names during deployment": "2025 年 5 月 10 日以降に追加されたチャネルの場合、デプロイ時にモデル名から「.」を削除する必要はありません",
     "For private deployments, format: https://fastgpt.run/api/openapi": "プライベートデプロイメントの場合、形式: https://fastgpt.run/api/openapi",
     "Force a syntactically valid JSON response": "構文的に有効な JSON 応答を強制",
@@ -5112,5 +5112,13 @@
     "Exported {{count}} invite codes": "已导出 {{count}} 个邀请码",
     "No invite codes available. Generate your first invite codes to get started.": "暂无邀请码。生成第一批邀请码开始使用。",
     "invite code": "邀请码"
-  }
+  },
+  "Request field maps": "リクエストフィールドマップ",
+  "Map selected Claude request fields onto the converted OpenAI body. Empty list = disabled. service_tier mapping also needs allow service_tier on this channel.": "選択した Claude リクエストフィールドを変換後の OpenAI ボディへマップします。空リストは無効です。service_tier マップにはこのチャネルで service_tier 許可も必要です。",
+  "Claude → OpenAI": "Claude → OpenAI",
+  "effort → reasoning_effort": "effort → reasoning_effort",
+  "service_tier → service_tier": "service_tier → service_tier",
+  "Add effort map": "effort マップを追加",
+  "Add service_tier map": "service_tier マップを追加",
+  "Delete": "削除"
 }
