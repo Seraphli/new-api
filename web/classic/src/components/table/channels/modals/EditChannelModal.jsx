@@ -72,8 +72,8 @@ import {
   collectInvalidStatusCodeEntries,
   collectNewDisallowedStatusCodeRedirects,
 } from './statusCodeRiskGuard';
-import {
 import { loadRequestFieldMaps, saveRequestFieldMaps } from '../../../../helpers/requestFieldMaps';
+import {
   IconSave,
   IconClose,
   IconServer,
