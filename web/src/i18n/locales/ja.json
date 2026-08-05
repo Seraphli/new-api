@@ -5276,7 +5276,11 @@
     "Request field maps JSON": "リクエストフィールドマップ JSON",
     "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "when/from/to の JSON 配列。サーバーは許可されたペアのみ受け付けます。service_tier はチャンネルで service_tier 許可も必要です。",
     "Fill effort example": "effort 例を入れる",
-    "Fill effort + service_tier example": "effort+service_tier 例を入れる"
+    "Fill effort + service_tier example": "effort+service_tier 例を入れる",
+    "Enable request tracing": "Enable request tracing",
+    "Export one OpenTelemetry span per request to your OTLP endpoint": "Export one OpenTelemetry span per request to your OTLP endpoint",
+    "OTLP trace endpoint": "OTLP trace endpoint",
+    "e.g. http://phoenix:6006/v1/traces": "e.g. http://phoenix:6006/v1/traces"
   },
   "Delete": "削除"
 }

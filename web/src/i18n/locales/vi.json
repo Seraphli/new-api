@@ -5276,7 +5276,11 @@
     "Request field maps JSON": "JSON ánh xạ trường yêu cầu",
     "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "Mảng JSON {when,from,to}. Máy chủ chỉ chấp nhận cặp trong allowlist. service_tier cũng cần bật cho phép service_tier trên kênh.",
     "Fill effort example": "Điền ví dụ effort",
-    "Fill effort + service_tier example": "Điền ví dụ effort+service_tier"
+    "Fill effort + service_tier example": "Điền ví dụ effort+service_tier",
+    "Enable request tracing": "Enable request tracing",
+    "Export one OpenTelemetry span per request to your OTLP endpoint": "Export one OpenTelemetry span per request to your OTLP endpoint",
+    "OTLP trace endpoint": "OTLP trace endpoint",
+    "e.g. http://phoenix:6006/v1/traces": "e.g. http://phoenix:6006/v1/traces"
   },
   "Delete": "Xóa"
 }

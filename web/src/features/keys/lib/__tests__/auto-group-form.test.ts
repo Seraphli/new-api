@@ -53,6 +53,8 @@ const baseApiKey: ApiKey = {
   model_limits_enabled: false,
   model_limits: '',
   allow_ips: '',
+  trace_enabled: false,
+  trace_otlp_endpoint: '',
 }
 
 describe('API key Auto group form mapping', () => {

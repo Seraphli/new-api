@@ -126,6 +126,10 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
+	if service.StartRelayTrace(c, relayInfo) {
+		defer func() { service.ExportRelayTrace(c, relayInfo, newAPIError) }()
+	}
+
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	needCountToken := constant.CountToken
 	// Avoid building huge CombineText (strings.Join) when token counting and sensitive check are both disabled.

@@ -1,0 +1,491 @@
+package service
+
+import (
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/QuantumNous/new-api/common"
+	"github.com/QuantumNous/new-api/constant"
+	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	relayconstant "github.com/QuantumNous/new-api/relay/constant"
+	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/QuantumNous/new-api/relaykit/types"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+// Minimal OTLP/protobuf-JSON wire types, kept independent of the production
+// otlp* structs in otlp_trace.go so the test verifies the actual emitted JSON
+// shape rather than round-tripping through the same struct definitions.
+type testOtlpValue struct {
+	StringValue *string `json:"stringValue"`
+	IntValue    *string `json:"intValue"`
+	BoolValue   *bool   `json:"boolValue"`
+}
+
+type testOtlpAttr struct {
+	Key   string        `json:"key"`
+	Value testOtlpValue `json:"value"`
+}
+
+type testOtlpStatus struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
+type testOtlpSpan struct {
+	TraceId    string         `json:"traceId"`
+	SpanId     string         `json:"spanId"`
+	Attributes []testOtlpAttr `json:"attributes"`
+	Status     testOtlpStatus `json:"status"`
+}
+
+type testOtlpScopeSpan struct {
+	Spans []testOtlpSpan `json:"spans"`
+}
+
+type testOtlpResource struct {
+	Attributes []testOtlpAttr `json:"attributes"`
+}
+
+type testOtlpResourceSpan struct {
+	Resource   testOtlpResource    `json:"resource"`
+	ScopeSpans []testOtlpScopeSpan `json:"scopeSpans"`
+}
+
+type testOtlpEnvelope struct {
+	ResourceSpans []testOtlpResourceSpan `json:"resourceSpans"`
+}
+
+func findAttr(attrs []testOtlpAttr, key string) (testOtlpAttr, bool) {
+	for _, a := range attrs {
+		if a.Key == key {
+			return a, true
+		}
+	}
+	return testOtlpAttr{}, false
+}
+
+func firstSpan(t *testing.T, payload []byte) (testOtlpEnvelope, testOtlpSpan) {
+	t.Helper()
+	var envelope testOtlpEnvelope
+	require.NoError(t, common.Unmarshal(payload, &envelope))
+	require.Len(t, envelope.ResourceSpans, 1)
+	require.Len(t, envelope.ResourceSpans[0].ScopeSpans, 1)
+	require.Len(t, envelope.ResourceSpans[0].ScopeSpans[0].Spans, 1)
+	return envelope, envelope.ResourceSpans[0].ScopeSpans[0].Spans[0]
+}
+
+// TC1: success inputs produce a well-formed span with the expected attributes.
+func TestBuildOTLPTracePayload_Success(t *testing.T) {
+	requestBody := []byte(`{"model":"gpt-4o","messages":[{"role":"user","content":"hi"}]}`)
+	responseBody := []byte(`{"id":"resp-1","choices":[{"message":{"role":"assistant","content":"hello"}}]}`)
+
+	payload, err := BuildOTLPTracePayload(TracePayloadParams{
+		RequestBody:      requestBody,
+		ResponseBody:     responseBody,
+		Model:            "gpt-4o",
+		TokenId:          7,
+		TokenName:        "t1",
+		ChannelId:        3,
+		RelayMode:        relayconstant.RelayModeChatCompletions,
+		StartTime:        time.Now(),
+		EndTime:          time.Now(),
+		StatusCode:       200,
+		IsError:          false,
+		IsStream:         false,
+		PromptTokens:     10,
+		CompletionTokens: 5,
+		TotalTokens:      15,
+		HasUsage:         true,
+	})
+	require.NoError(t, err)
+
+	envelope, span := firstSpan(t, payload)
+
+	svcName, ok := findAttr(envelope.ResourceSpans[0].Resource.Attributes, "service.name")
+	require.True(t, ok)
+	require.NotNil(t, svcName.Value.StringValue)
+	assert.Equal(t, "new-api", *svcName.Value.StringValue)
+
+	assert.Regexp(t, "^[0-9a-f]{32}$", span.TraceId)
+	assert.Regexp(t, "^[0-9a-f]{16}$", span.SpanId)
+
+	kind, ok := findAttr(span.Attributes, "openinference.span.kind")
+	require.True(t, ok)
+	assert.Equal(t, "LLM", *kind.Value.StringValue)
+
+	inputValue, ok := findAttr(span.Attributes, "input.value")
+	require.True(t, ok)
+	assert.Equal(t, string(requestBody), *inputValue.Value.StringValue)
+
+	inputMime, ok := findAttr(span.Attributes, "input.mime_type")
+	require.True(t, ok)
+	assert.Equal(t, "application/json", *inputMime.Value.StringValue)
+
+	outputValue, ok := findAttr(span.Attributes, "output.value")
+	require.True(t, ok)
+	assert.Equal(t, string(responseBody), *outputValue.Value.StringValue)
+
+	modelName, ok := findAttr(span.Attributes, "llm.model_name")
+	require.True(t, ok)
+	assert.Equal(t, "gpt-4o", *modelName.Value.StringValue)
+
+	promptCount, ok := findAttr(span.Attributes, "llm.token_count.prompt")
+	require.True(t, ok)
+	assert.Equal(t, "10", *promptCount.Value.IntValue)
+
+	completionCount, ok := findAttr(span.Attributes, "llm.token_count.completion")
+	require.True(t, ok)
+	assert.Equal(t, "5", *completionCount.Value.IntValue)
+
+	totalCount, ok := findAttr(span.Attributes, "llm.token_count.total")
+	require.True(t, ok)
+	assert.Equal(t, "15", *totalCount.Value.IntValue)
+
+	tokenId, ok := findAttr(span.Attributes, "newapi.token.id")
+	require.True(t, ok)
+	assert.Equal(t, "7", *tokenId.Value.IntValue)
+
+	tokenName, ok := findAttr(span.Attributes, "newapi.token.name")
+	require.True(t, ok)
+	assert.Equal(t, "t1", *tokenName.Value.StringValue)
+
+	channelId, ok := findAttr(span.Attributes, "newapi.channel.id")
+	require.True(t, ok)
+	assert.Equal(t, "3", *channelId.Value.IntValue)
+
+	statusCode, ok := findAttr(span.Attributes, "newapi.http.status_code")
+	require.True(t, ok)
+	assert.Equal(t, "200", *statusCode.Value.IntValue)
+
+	assert.Equal(t, 1, span.Status.Code)
+}
+
+// TC2: ExportOTLPTrace POSTs the payload to the configured endpoint exactly once.
+func TestExportOTLPTrace_PostsPayload(t *testing.T) {
+	initDefaultHTTPClientFixture(t)
+
+	type captured struct {
+		method      string
+		path        string
+		contentType string
+		body        []byte
+	}
+	received := make(chan captured, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		received <- captured{method: r.Method, path: r.URL.Path, contentType: r.Header.Get("Content-Type"), body: body}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	payload, err := BuildOTLPTracePayload(TracePayloadParams{
+		RequestBody:  []byte(`{"model":"gpt-4o"}`),
+		ResponseBody: []byte(`{"ok":true}`),
+		Model:        "gpt-4o",
+		TokenId:      1,
+		TokenName:    "t",
+		ChannelId:    1,
+		RelayMode:    relayconstant.RelayModeChatCompletions,
+		StartTime:    time.Now(),
+		EndTime:      time.Now(),
+		StatusCode:   200,
+	})
+	require.NoError(t, err)
+
+	ExportOTLPTrace(server.URL+"/v1/traces", payload)
+
+	select {
+	case got := <-received:
+		assert.Equal(t, http.MethodPost, got.method)
+		assert.Equal(t, "/v1/traces", got.path)
+		assert.Equal(t, "application/json", got.contentType)
+		var envelope testOtlpEnvelope
+		require.NoError(t, common.Unmarshal(got.body, &envelope))
+		assert.Len(t, envelope.ResourceSpans, 1)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for OTLP export request")
+	}
+
+	select {
+	case <-received:
+		t.Fatal("expected exactly one export request")
+	default:
+	}
+}
+
+// TC3: failure inputs mark the span as errored and omit token count attributes.
+func TestBuildOTLPTracePayload_Failure(t *testing.T) {
+	payload, err := BuildOTLPTracePayload(TracePayloadParams{
+		RequestBody:       []byte(`{"model":"gpt-4o"}`),
+		UpstreamErrorBody: `{"error":"upstream boom"}`,
+		Model:             "gpt-4o",
+		TokenId:           1,
+		TokenName:         "t",
+		ChannelId:         1,
+		RelayMode:         relayconstant.RelayModeChatCompletions,
+		StartTime:         time.Now(),
+		EndTime:           time.Now(),
+		StatusCode:        502,
+		IsError:           true,
+		HasUsage:          false,
+	})
+	require.NoError(t, err)
+
+	_, span := firstSpan(t, payload)
+
+	assert.Equal(t, 2, span.Status.Code)
+	assert.NotEmpty(t, span.Status.Message)
+
+	outputValue, ok := findAttr(span.Attributes, "output.value")
+	require.True(t, ok)
+	assert.Contains(t, *outputValue.Value.StringValue, "upstream boom")
+
+	statusCode, ok := findAttr(span.Attributes, "newapi.http.status_code")
+	require.True(t, ok)
+	assert.Equal(t, "502", *statusCode.Value.IntValue)
+
+	_, ok = findAttr(span.Attributes, "llm.token_count.prompt")
+	assert.False(t, ok)
+	_, ok = findAttr(span.Attributes, "llm.token_count.completion")
+	assert.False(t, ok)
+	_, ok = findAttr(span.Attributes, "llm.token_count.total")
+	assert.False(t, ok)
+}
+
+// TC4: StartRelayTrace returns false when tracing is disabled, or when enabled
+// but no endpoint is configured; no export request must ever be sent.
+func TestStartRelayTrace_DisabledOrMissingEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	received := make(chan struct{}, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		received <- struct{}{}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	info := &relaycommon.RelayInfo{RelayFormat: types.RelayFormatOpenAI}
+
+	w1 := httptest.NewRecorder()
+	c1, _ := gin.CreateTestContext(w1)
+	common.SetContextKey(c1, constant.ContextKeyTokenTraceEnabled, false)
+	common.SetContextKey(c1, constant.ContextKeyTokenTraceEndpoint, server.URL+"/v1/traces")
+	assert.False(t, StartRelayTrace(c1, info))
+
+	w2 := httptest.NewRecorder()
+	c2, _ := gin.CreateTestContext(w2)
+	common.SetContextKey(c2, constant.ContextKeyTokenTraceEnabled, true)
+	common.SetContextKey(c2, constant.ContextKeyTokenTraceEndpoint, "")
+	assert.False(t, StartRelayTrace(c2, info))
+
+	select {
+	case <-received:
+		t.Fatal("expected zero export requests when tracing is not active")
+	default:
+	}
+}
+
+// TC5: StartRelayTrace activates tracing when enabled with an endpoint;
+// TraceCaptureResponseText fills the buffer and feeds a stream payload.
+func TestStartRelayTrace_EnabledCapturesStreamText(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	common.SetContextKey(c, constant.ContextKeyTokenTraceEnabled, true)
+	common.SetContextKey(c, constant.ContextKeyTokenTraceEndpoint, "http://collector.local/v1/traces")
+
+	info := &relaycommon.RelayInfo{RelayFormat: types.RelayFormatOpenAI}
+	require.True(t, StartRelayTrace(c, info))
+
+	TraceCaptureResponseText(c, "Hello world")
+
+	buf := getTraceBuffer(c)
+	require.NotNil(t, buf)
+	assert.Equal(t, "Hello world", buf.ResponseText)
+	assert.True(t, buf.ResponseIsStream)
+
+	payload, err := BuildOTLPTracePayload(TracePayloadParams{
+		RequestBody:  []byte(`{"model":"gpt-4o"}`),
+		ResponseText: "Hello world",
+		IsStream:     true,
+		Model:        "gpt-4o",
+		TokenId:      1,
+		TokenName:    "t",
+		ChannelId:    1,
+		RelayMode:    relayconstant.RelayModeChatCompletions,
+		StartTime:    time.Now(),
+		EndTime:      time.Now(),
+		StatusCode:   200,
+	})
+	require.NoError(t, err)
+
+	_, span := firstSpan(t, payload)
+	outputValue, ok := findAttr(span.Attributes, "output.value")
+	require.True(t, ok)
+	assert.Equal(t, "Hello world", *outputValue.Value.StringValue)
+
+	outputMime, ok := findAttr(span.Attributes, "output.mime_type")
+	require.True(t, ok)
+	assert.Equal(t, "text/plain", *outputMime.Value.StringValue)
+}
+
+// TC6: input.value beyond MaxTraceValueBytes is truncated and flagged; values
+// within the cap are left untouched with no truncation flag.
+func TestBuildOTLPTracePayload_Truncation(t *testing.T) {
+	longInput := strings.Repeat("a", MaxTraceValueBytes+100)
+
+	payload, err := BuildOTLPTracePayload(TracePayloadParams{
+		RequestBody:  []byte(longInput),
+		ResponseBody: []byte(`{"ok":true}`),
+		Model:        "gpt-4o",
+		TokenId:      1,
+		TokenName:    "t",
+		ChannelId:    1,
+		RelayMode:    relayconstant.RelayModeChatCompletions,
+		StartTime:    time.Now(),
+		EndTime:      time.Now(),
+		StatusCode:   200,
+	})
+	require.NoError(t, err)
+
+	_, span := firstSpan(t, payload)
+
+	inputValue, ok := findAttr(span.Attributes, "input.value")
+	require.True(t, ok)
+	assert.Len(t, *inputValue.Value.StringValue, MaxTraceValueBytes)
+
+	truncatedAttr, ok := findAttr(span.Attributes, "newapi.truncated")
+	require.True(t, ok)
+	require.NotNil(t, truncatedAttr.Value.BoolValue)
+	assert.True(t, *truncatedAttr.Value.BoolValue)
+
+	payload2, err := BuildOTLPTracePayload(TracePayloadParams{
+		RequestBody:  []byte(`{"short":true}`),
+		ResponseBody: []byte(`{"ok":true}`),
+		Model:        "gpt-4o",
+		TokenId:      1,
+		TokenName:    "t",
+		ChannelId:    1,
+		RelayMode:    relayconstant.RelayModeChatCompletions,
+		StartTime:    time.Now(),
+		EndTime:      time.Now(),
+		StatusCode:   200,
+	})
+	require.NoError(t, err)
+
+	_, span2 := firstSpan(t, payload2)
+	_, ok = findAttr(span2.Attributes, "newapi.truncated")
+	assert.False(t, ok)
+}
+
+// TC7: BuildOTLPTracePayload takes no channel-key/Authorization fields, so
+// secrets can never reach the emitted JSON.
+func TestBuildOTLPTracePayload_NoSecretsLeak(t *testing.T) {
+	payload, err := BuildOTLPTracePayload(TracePayloadParams{
+		RequestBody:  []byte(`{"model":"gpt-4o","messages":[{"role":"user","content":"hello, non-secret content"}]}`),
+		ResponseBody: []byte(`{"id":"resp-1","choices":[{"message":{"role":"assistant","content":"hi there"}}]}`),
+		Model:        "gpt-4o",
+		TokenId:      1,
+		TokenName:    "t",
+		ChannelId:    1,
+		RelayMode:    relayconstant.RelayModeChatCompletions,
+		StartTime:    time.Now(),
+		EndTime:      time.Now(),
+		StatusCode:   200,
+	})
+	require.NoError(t, err)
+
+	// TracePayloadParams has no field for a channel key or Authorization
+	// header, so secrets like these can never reach the builder's output.
+	assert.NotContains(t, string(payload), "ck-secretXYZ")
+	assert.NotContains(t, string(payload), "authsecret")
+}
+
+// TC11(a): audio speech responses are binary, so the span omits output.value
+// and records newapi.output.omitted instead.
+func TestBuildOTLPTracePayload_AudioSpeechOmitsOutput(t *testing.T) {
+	payload, err := BuildOTLPTracePayload(TracePayloadParams{
+		RequestBody: []byte(`{"model":"tts-1","input":"hello"}`),
+		Model:       "tts-1",
+		TokenId:     1,
+		TokenName:   "t",
+		ChannelId:   1,
+		RelayMode:   relayconstant.RelayModeAudioSpeech,
+		StartTime:   time.Now(),
+		EndTime:     time.Now(),
+		StatusCode:  200,
+		IsError:     false,
+	})
+	require.NoError(t, err)
+
+	_, span := firstSpan(t, payload)
+
+	_, ok := findAttr(span.Attributes, "output.value")
+	assert.False(t, ok)
+
+	omitted, ok := findAttr(span.Attributes, "newapi.output.omitted")
+	require.True(t, ok)
+	assert.Equal(t, "binary", *omitted.Value.StringValue)
+}
+
+// TC11(b): TraceCaptureUsage fills the buffer, and those counts flow through
+// to the llm.token_count.* attributes.
+func TestTraceCaptureUsage_SetsBufferAndPayload(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	common.SetContextKey(c, constant.ContextKeyTokenTraceEnabled, true)
+	common.SetContextKey(c, constant.ContextKeyTokenTraceEndpoint, "http://collector.local/v1/traces")
+
+	info := &relaycommon.RelayInfo{RelayFormat: types.RelayFormatOpenAI}
+	require.True(t, StartRelayTrace(c, info))
+
+	TraceCaptureUsage(c, &dto.Usage{PromptTokens: 3, CompletionTokens: 4, TotalTokens: 7})
+
+	buf := getTraceBuffer(c)
+	require.NotNil(t, buf)
+	assert.True(t, buf.HasUsage)
+	assert.Equal(t, 3, buf.PromptTokens)
+	assert.Equal(t, 4, buf.CompletionTokens)
+	assert.Equal(t, 7, buf.TotalTokens)
+
+	payload, err := BuildOTLPTracePayload(TracePayloadParams{
+		RequestBody:      []byte(`{"model":"gpt-4o"}`),
+		ResponseBody:     []byte(`{"ok":true}`),
+		Model:            "gpt-4o",
+		TokenId:          1,
+		TokenName:        "t",
+		ChannelId:        1,
+		RelayMode:        relayconstant.RelayModeChatCompletions,
+		StartTime:        time.Now(),
+		EndTime:          time.Now(),
+		StatusCode:       200,
+		HasUsage:         true,
+		PromptTokens:     buf.PromptTokens,
+		CompletionTokens: buf.CompletionTokens,
+		TotalTokens:      buf.TotalTokens,
+	})
+	require.NoError(t, err)
+
+	_, span := firstSpan(t, payload)
+
+	promptCount, ok := findAttr(span.Attributes, "llm.token_count.prompt")
+	require.True(t, ok)
+	assert.Equal(t, "3", *promptCount.Value.IntValue)
+
+	completionCount, ok := findAttr(span.Attributes, "llm.token_count.completion")
+	require.True(t, ok)
+	assert.Equal(t, "4", *completionCount.Value.IntValue)
+
+	totalCount, ok := findAttr(span.Attributes, "llm.token_count.total")
+	require.True(t, ok)
+	assert.Equal(t, "7", *totalCount.Value.IntValue)
+}

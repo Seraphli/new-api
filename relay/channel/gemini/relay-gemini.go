@@ -203,6 +203,8 @@ func geminiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 		patchGeminiZeroCompletionUsage(c, info, usage, responseText.String(), imageCount)
 	}
 
+	service.TraceCaptureResponseText(c, responseText.String())
+
 	return usage, nil
 }
 

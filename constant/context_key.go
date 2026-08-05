@@ -20,6 +20,9 @@ const (
 	ContextKeyTokenModelLimit        ContextKey = "token_model_limit"
 	ContextKeyTokenCrossGroupRetry   ContextKey = "token_cross_group_retry"
 	ContextKeyTokenAutoGroups        ContextKey = "token_auto_groups"
+	ContextKeyTokenTraceEnabled      ContextKey = "token_trace_enabled"
+	ContextKeyTokenTraceEndpoint     ContextKey = "token_trace_endpoint"
+	ContextKeyTraceBuffer            ContextKey = "otlp_trace_buffer"
 
 	/* channel related keys */
 	ContextKeyChannelId                ContextKey = "channel_id"

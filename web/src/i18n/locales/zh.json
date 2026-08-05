@@ -5276,7 +5276,11 @@
     "Request field maps JSON": "请求字段映射 JSON",
     "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "JSON 数组，每项含 when/from/to。服务端仅接受白名单映射对。service_tier 映射还需在本渠道开启允许 service_tier 透传。",
     "Fill effort example": "填入 effort 示例",
-    "Fill effort + service_tier example": "填入 effort+service_tier 示例"
+    "Fill effort + service_tier example": "填入 effort+service_tier 示例",
+    "Enable request tracing": "Enable request tracing",
+    "Export one OpenTelemetry span per request to your OTLP endpoint": "Export one OpenTelemetry span per request to your OTLP endpoint",
+    "OTLP trace endpoint": "OTLP trace endpoint",
+    "e.g. http://phoenix:6006/v1/traces": "e.g. http://phoenix:6006/v1/traces"
   },
   "Delete": "删除"
 }

@@ -3,5 +3,9 @@
   "Copied: {{code}}": "已复制：{{code}}",
   "Total: {{total}}": "共 {{total}} 条",
   "Export selected codes as CSV": "导出选中的邀请码为 CSV",
-  "Exported {{count}} invite codes": "已导出 {{count}} 个邀请码"
+  "Exported {{count}} invite codes": "已导出 {{count}} 个邀请码",
+  "Enable request tracing": "Enable request tracing",
+  "Export one OpenTelemetry span per request to your OTLP endpoint": "Export one OpenTelemetry span per request to your OTLP endpoint",
+  "OTLP trace endpoint": "OTLP trace endpoint",
+  "e.g. http://phoenix:6006/v1/traces": "e.g. http://phoenix:6006/v1/traces"
 }

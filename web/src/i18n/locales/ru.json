@@ -5276,7 +5276,11 @@
     "Request field maps JSON": "JSON сопоставления полей",
     "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "JSON-массив {when,from,to}. Сервер принимает только разрешённые пары. Для service_tier нужно также разрешить service_tier на канале.",
     "Fill effort example": "Подставить пример effort",
-    "Fill effort + service_tier example": "Подставить effort+service_tier"
+    "Fill effort + service_tier example": "Подставить effort+service_tier",
+    "Enable request tracing": "Enable request tracing",
+    "Export one OpenTelemetry span per request to your OTLP endpoint": "Export one OpenTelemetry span per request to your OTLP endpoint",
+    "OTLP trace endpoint": "OTLP trace endpoint",
+    "e.g. http://phoenix:6006/v1/traces": "e.g. http://phoenix:6006/v1/traces"
   },
   "Delete": "Удалить"
 }

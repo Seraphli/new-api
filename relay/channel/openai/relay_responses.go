@@ -174,5 +174,7 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 
 	usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 
+	service.TraceCaptureResponseText(c, responseTextBuilder.String())
+
 	return usage, nil
 }
