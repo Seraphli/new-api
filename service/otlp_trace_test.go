@@ -291,6 +291,18 @@ func TestStartRelayTrace_DisabledOrMissingEndpoint(t *testing.T) {
 		t.Fatal("expected zero export requests when tracing is not active")
 	default:
 	}
+
+	// Neither call to StartRelayTrace created a traceBuffer on c1/c2, so
+	// getTraceBuffer returns nil and ExportRelayTrace must early-return
+	// without ever posting to the collector.
+	ExportRelayTrace(c1, info, nil)
+	ExportRelayTrace(c2, info, nil)
+
+	select {
+	case <-received:
+		t.Fatal("expected zero export requests when no trace buffer was started")
+	case <-time.After(200 * time.Millisecond):
+	}
 }
 
 // TC5: StartRelayTrace activates tracing when enabled with an endpoint;
@@ -386,27 +398,86 @@ func TestBuildOTLPTracePayload_Truncation(t *testing.T) {
 	assert.False(t, ok)
 }
 
-// TC7: BuildOTLPTracePayload takes no channel-key/Authorization fields, so
-// secrets can never reach the emitted JSON.
-func TestBuildOTLPTracePayload_NoSecretsLeak(t *testing.T) {
-	payload, err := BuildOTLPTracePayload(TracePayloadParams{
-		RequestBody:  []byte(`{"model":"gpt-4o","messages":[{"role":"user","content":"hello, non-secret content"}]}`),
-		ResponseBody: []byte(`{"id":"resp-1","choices":[{"message":{"role":"assistant","content":"hi there"}}]}`),
-		Model:        "gpt-4o",
-		TokenId:      1,
-		TokenName:    "t",
-		ChannelId:    1,
-		RelayMode:    relayconstant.RelayModeChatCompletions,
-		StartTime:    time.Now(),
-		EndTime:      time.Now(),
-		StatusCode:   200,
-	})
-	require.NoError(t, err)
+// TC7: end-to-end ExportRelayTrace run with a token key and channel key held
+// on the *relaycommon.RelayInfo — the exact fields ExportRelayTrace actually
+// reads (info.TokenKey, info.ChannelMeta.ApiKey) — proves those secrets never
+// reach the exported OTLP payload actually POSTed to the collector, while the
+// token identity (name) is still emitted.
+func TestExportRelayTrace_NoSecretsLeak(t *testing.T) {
+	initDefaultHTTPClientFixture(t)
+	gin.SetMode(gin.TestMode)
 
-	// TracePayloadParams has no field for a channel key or Authorization
-	// header, so secrets like these can never reach the builder's output.
-	assert.NotContains(t, string(payload), "ck-secretXYZ")
-	assert.NotContains(t, string(payload), "authsecret")
+	received := make(chan []byte, 1)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		received <- body
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(`{"model":"gpt-4o","messages":[{"role":"user","content":"hello"}]}`))
+	c.Set("token_name", "safe-token-name")
+	common.SetContextKey(c, constant.ContextKeyTokenTraceEnabled, true)
+	common.SetContextKey(c, constant.ContextKeyTokenTraceEndpoint, server.URL)
+
+	info := &relaycommon.RelayInfo{
+		TokenId:         1,
+		TokenKey:        "sk-TOKENSECRET",
+		OriginModelName: "gpt-4o",
+		StartTime:       time.Now(),
+		RelayFormat:     types.RelayFormatOpenAI,
+	}
+	info.ChannelMeta = &relaycommon.ChannelMeta{ChannelId: 3, ApiKey: "ck-CHANNELSECRET"}
+
+	require.True(t, StartRelayTrace(c, info))
+
+	TraceCaptureResponseBody(c, []byte(`{"choices":[{"message":{"content":"hi there"}}]}`))
+
+	ExportRelayTrace(c, info, nil)
+
+	select {
+	case body := <-received:
+		require.NotEmpty(t, body)
+		bodyStr := string(body)
+
+		// Proves the token IDENTITY (its name) is emitted, and a real span was built.
+		assert.Contains(t, bodyStr, "safe-token-name")
+		assert.Contains(t, bodyStr, "gpt-4o")
+
+		// Non-vacuous core: the token KEY (info.TokenKey) and the channel KEY
+		// (info.ChannelMeta.ApiKey) must never appear in the exported payload.
+		assert.NotContains(t, bodyStr, "sk-TOKENSECRET")
+		assert.NotContains(t, bodyStr, "ck-CHANNELSECRET")
+
+		// Belt-and-suspenders: every attribute key on the span must be within the
+		// known whitelist, so any future attribute leaking an unexpected value is
+		// caught even if its value happens not to match a hardcoded secret string.
+		_, span := firstSpan(t, body)
+		allowedAttrKeys := map[string]bool{
+			"openinference.span.kind":    true,
+			"input.value":                true,
+			"input.mime_type":            true,
+			"output.value":               true,
+			"output.mime_type":           true,
+			"llm.model_name":             true,
+			"llm.token_count.prompt":     true,
+			"llm.token_count.completion": true,
+			"llm.token_count.total":      true,
+			"newapi.token.id":            true,
+			"newapi.token.name":          true,
+			"newapi.channel.id":          true,
+			"newapi.http.status_code":    true,
+			"newapi.truncated":           true,
+			"newapi.output.omitted":      true,
+		}
+		for _, attr := range span.Attributes {
+			assert.True(t, allowedAttrKeys[attr.Key], "unexpected span attribute key: %s", attr.Key)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for OTLP export request")
+	}
 }
 
 // TC11(a): audio speech responses are binary, so the span omits output.value
