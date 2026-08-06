@@ -1,6 +1,7 @@
 package service
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -18,68 +19,28 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/protobuf/proto"
 )
 
-// Minimal OTLP/protobuf-JSON wire types, kept independent of the production
-// otlp* structs in otlp_trace.go so the test verifies the actual emitted JSON
-// shape rather than round-tripping through the same struct definitions.
-type testOtlpValue struct {
-	StringValue *string `json:"stringValue"`
-	IntValue    *string `json:"intValue"`
-	BoolValue   *bool   `json:"boolValue"`
-}
-
-type testOtlpAttr struct {
-	Key   string        `json:"key"`
-	Value testOtlpValue `json:"value"`
-}
-
-type testOtlpStatus struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-}
-
-type testOtlpSpan struct {
-	TraceId    string         `json:"traceId"`
-	SpanId     string         `json:"spanId"`
-	Attributes []testOtlpAttr `json:"attributes"`
-	Status     testOtlpStatus `json:"status"`
-}
-
-type testOtlpScopeSpan struct {
-	Spans []testOtlpSpan `json:"spans"`
-}
-
-type testOtlpResource struct {
-	Attributes []testOtlpAttr `json:"attributes"`
-}
-
-type testOtlpResourceSpan struct {
-	Resource   testOtlpResource    `json:"resource"`
-	ScopeSpans []testOtlpScopeSpan `json:"scopeSpans"`
-}
-
-type testOtlpEnvelope struct {
-	ResourceSpans []testOtlpResourceSpan `json:"resourceSpans"`
-}
-
-func findAttr(attrs []testOtlpAttr, key string) (testOtlpAttr, bool) {
+func findAttr(attrs []*commonpb.KeyValue, key string) (*commonpb.AnyValue, bool) {
 	for _, a := range attrs {
 		if a.Key == key {
-			return a, true
+			return a.Value, true
 		}
 	}
-	return testOtlpAttr{}, false
+	return nil, false
 }
 
-func firstSpan(t *testing.T, payload []byte) (testOtlpEnvelope, testOtlpSpan) {
+func firstSpan(t *testing.T, payload []byte) (*tracepb.TracesData, *tracepb.Span) {
 	t.Helper()
-	var envelope testOtlpEnvelope
-	require.NoError(t, common.Unmarshal(payload, &envelope))
-	require.Len(t, envelope.ResourceSpans, 1)
-	require.Len(t, envelope.ResourceSpans[0].ScopeSpans, 1)
-	require.Len(t, envelope.ResourceSpans[0].ScopeSpans[0].Spans, 1)
-	return envelope, envelope.ResourceSpans[0].ScopeSpans[0].Spans[0]
+	var td tracepb.TracesData
+	require.NoError(t, proto.Unmarshal(payload, &td))
+	require.Len(t, td.ResourceSpans, 1)
+	require.Len(t, td.ResourceSpans[0].ScopeSpans, 1)
+	require.Len(t, td.ResourceSpans[0].ScopeSpans[0].Spans, 1)
+	return &td, td.ResourceSpans[0].ScopeSpans[0].Spans[0]
 }
 
 // TC1: success inputs produce a well-formed span with the expected attributes.
@@ -107,65 +68,64 @@ func TestBuildOTLPTracePayload_Success(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	envelope, span := firstSpan(t, payload)
+	td, span := firstSpan(t, payload)
 
-	svcName, ok := findAttr(envelope.ResourceSpans[0].Resource.Attributes, "service.name")
+	svcName, ok := findAttr(td.ResourceSpans[0].Resource.Attributes, "service.name")
 	require.True(t, ok)
-	require.NotNil(t, svcName.Value.StringValue)
-	assert.Equal(t, "new-api", *svcName.Value.StringValue)
+	assert.Equal(t, "new-api", svcName.GetStringValue())
 
-	assert.Regexp(t, "^[0-9a-f]{32}$", span.TraceId)
-	assert.Regexp(t, "^[0-9a-f]{16}$", span.SpanId)
+	assert.Len(t, span.TraceId, 16)
+	assert.Len(t, span.SpanId, 8)
 
 	kind, ok := findAttr(span.Attributes, "openinference.span.kind")
 	require.True(t, ok)
-	assert.Equal(t, "LLM", *kind.Value.StringValue)
+	assert.Equal(t, "LLM", kind.GetStringValue())
 
 	inputValue, ok := findAttr(span.Attributes, "input.value")
 	require.True(t, ok)
-	assert.Equal(t, string(requestBody), *inputValue.Value.StringValue)
+	assert.Equal(t, string(requestBody), inputValue.GetStringValue())
 
 	inputMime, ok := findAttr(span.Attributes, "input.mime_type")
 	require.True(t, ok)
-	assert.Equal(t, "application/json", *inputMime.Value.StringValue)
+	assert.Equal(t, "application/json", inputMime.GetStringValue())
 
 	outputValue, ok := findAttr(span.Attributes, "output.value")
 	require.True(t, ok)
-	assert.Equal(t, string(responseBody), *outputValue.Value.StringValue)
+	assert.Equal(t, string(responseBody), outputValue.GetStringValue())
 
 	modelName, ok := findAttr(span.Attributes, "llm.model_name")
 	require.True(t, ok)
-	assert.Equal(t, "gpt-4o", *modelName.Value.StringValue)
+	assert.Equal(t, "gpt-4o", modelName.GetStringValue())
 
 	promptCount, ok := findAttr(span.Attributes, "llm.token_count.prompt")
 	require.True(t, ok)
-	assert.Equal(t, "10", *promptCount.Value.IntValue)
+	assert.Equal(t, int64(10), promptCount.GetIntValue())
 
 	completionCount, ok := findAttr(span.Attributes, "llm.token_count.completion")
 	require.True(t, ok)
-	assert.Equal(t, "5", *completionCount.Value.IntValue)
+	assert.Equal(t, int64(5), completionCount.GetIntValue())
 
 	totalCount, ok := findAttr(span.Attributes, "llm.token_count.total")
 	require.True(t, ok)
-	assert.Equal(t, "15", *totalCount.Value.IntValue)
+	assert.Equal(t, int64(15), totalCount.GetIntValue())
 
 	tokenId, ok := findAttr(span.Attributes, "newapi.token.id")
 	require.True(t, ok)
-	assert.Equal(t, "7", *tokenId.Value.IntValue)
+	assert.Equal(t, int64(7), tokenId.GetIntValue())
 
 	tokenName, ok := findAttr(span.Attributes, "newapi.token.name")
 	require.True(t, ok)
-	assert.Equal(t, "t1", *tokenName.Value.StringValue)
+	assert.Equal(t, "t1", tokenName.GetStringValue())
 
 	channelId, ok := findAttr(span.Attributes, "newapi.channel.id")
 	require.True(t, ok)
-	assert.Equal(t, "3", *channelId.Value.IntValue)
+	assert.Equal(t, int64(3), channelId.GetIntValue())
 
 	statusCode, ok := findAttr(span.Attributes, "newapi.http.status_code")
 	require.True(t, ok)
-	assert.Equal(t, "200", *statusCode.Value.IntValue)
+	assert.Equal(t, int64(200), statusCode.GetIntValue())
 
-	assert.Equal(t, 1, span.Status.Code)
+	assert.Equal(t, tracepb.Status_STATUS_CODE_OK, span.Status.Code)
 }
 
 // TC2: ExportOTLPTrace POSTs the payload to the configured endpoint exactly once.
@@ -206,10 +166,10 @@ func TestExportOTLPTrace_PostsPayload(t *testing.T) {
 	case got := <-received:
 		assert.Equal(t, http.MethodPost, got.method)
 		assert.Equal(t, "/v1/traces", got.path)
-		assert.Equal(t, "application/json", got.contentType)
-		var envelope testOtlpEnvelope
-		require.NoError(t, common.Unmarshal(got.body, &envelope))
-		assert.Len(t, envelope.ResourceSpans, 1)
+		assert.Equal(t, "application/x-protobuf", got.contentType)
+		var td tracepb.TracesData
+		require.NoError(t, proto.Unmarshal(got.body, &td))
+		assert.Len(t, td.ResourceSpans, 1)
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for OTLP export request")
 	}
@@ -241,16 +201,16 @@ func TestBuildOTLPTracePayload_Failure(t *testing.T) {
 
 	_, span := firstSpan(t, payload)
 
-	assert.Equal(t, 2, span.Status.Code)
+	assert.Equal(t, tracepb.Status_STATUS_CODE_ERROR, span.Status.Code)
 	assert.NotEmpty(t, span.Status.Message)
 
 	outputValue, ok := findAttr(span.Attributes, "output.value")
 	require.True(t, ok)
-	assert.Contains(t, *outputValue.Value.StringValue, "upstream boom")
+	assert.Contains(t, outputValue.GetStringValue(), "upstream boom")
 
 	statusCode, ok := findAttr(span.Attributes, "newapi.http.status_code")
 	require.True(t, ok)
-	assert.Equal(t, "502", *statusCode.Value.IntValue)
+	assert.Equal(t, int64(502), statusCode.GetIntValue())
 
 	_, ok = findAttr(span.Attributes, "llm.token_count.prompt")
 	assert.False(t, ok)
@@ -342,11 +302,11 @@ func TestStartRelayTrace_EnabledCapturesStreamText(t *testing.T) {
 	_, span := firstSpan(t, payload)
 	outputValue, ok := findAttr(span.Attributes, "output.value")
 	require.True(t, ok)
-	assert.Equal(t, "Hello world", *outputValue.Value.StringValue)
+	assert.Equal(t, "Hello world", outputValue.GetStringValue())
 
 	outputMime, ok := findAttr(span.Attributes, "output.mime_type")
 	require.True(t, ok)
-	assert.Equal(t, "text/plain", *outputMime.Value.StringValue)
+	assert.Equal(t, "text/plain", outputMime.GetStringValue())
 }
 
 // TC6: input.value beyond MaxTraceValueBytes is truncated and flagged; values
@@ -372,12 +332,11 @@ func TestBuildOTLPTracePayload_Truncation(t *testing.T) {
 
 	inputValue, ok := findAttr(span.Attributes, "input.value")
 	require.True(t, ok)
-	assert.Len(t, *inputValue.Value.StringValue, MaxTraceValueBytes)
+	assert.Len(t, inputValue.GetStringValue(), MaxTraceValueBytes)
 
 	truncatedAttr, ok := findAttr(span.Attributes, "newapi.truncated")
 	require.True(t, ok)
-	require.NotNil(t, truncatedAttr.Value.BoolValue)
-	assert.True(t, *truncatedAttr.Value.BoolValue)
+	assert.True(t, truncatedAttr.GetBoolValue())
 
 	payload2, err := BuildOTLPTracePayload(TracePayloadParams{
 		RequestBody:  []byte(`{"short":true}`),
@@ -443,6 +402,8 @@ func TestExportRelayTrace_NoSecretsLeak(t *testing.T) {
 		bodyStr := string(body)
 
 		// Proves the token IDENTITY (its name) is emitted, and a real span was built.
+		// Proto encodes strings as raw UTF-8 bytes, so substring checks on the raw
+		// wire bytes still work.
 		assert.Contains(t, bodyStr, "safe-token-name")
 		assert.Contains(t, bodyStr, "gpt-4o")
 
@@ -504,7 +465,7 @@ func TestBuildOTLPTracePayload_AudioSpeechOmitsOutput(t *testing.T) {
 
 	omitted, ok := findAttr(span.Attributes, "newapi.output.omitted")
 	require.True(t, ok)
-	assert.Equal(t, "binary", *omitted.Value.StringValue)
+	assert.Equal(t, "binary", omitted.GetStringValue())
 }
 
 // TC11(b): TraceCaptureUsage fills the buffer, and those counts flow through
@@ -550,13 +511,54 @@ func TestTraceCaptureUsage_SetsBufferAndPayload(t *testing.T) {
 
 	promptCount, ok := findAttr(span.Attributes, "llm.token_count.prompt")
 	require.True(t, ok)
-	assert.Equal(t, "3", *promptCount.Value.IntValue)
+	assert.Equal(t, int64(3), promptCount.GetIntValue())
 
 	completionCount, ok := findAttr(span.Attributes, "llm.token_count.completion")
 	require.True(t, ok)
-	assert.Equal(t, "4", *completionCount.Value.IntValue)
+	assert.Equal(t, int64(4), completionCount.GetIntValue())
 
 	totalCount, ok := findAttr(span.Attributes, "llm.token_count.total")
 	require.True(t, ok)
-	assert.Equal(t, "7", *totalCount.Value.IntValue)
+	assert.Equal(t, int64(7), totalCount.GetIntValue())
+}
+
+// TestExportOTLPTrace_LogsNon2xx verifies a non-2xx response from the collector
+// is logged via common.SysError with the status code, and never panics.
+func TestExportOTLPTrace_LogsNon2xx(t *testing.T) {
+	initDefaultHTTPClientFixture(t)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnsupportedMediaType)
+		_, _ = w.Write([]byte("unsupported media type"))
+	}))
+	defer server.Close()
+
+	var logBuffer bytes.Buffer
+	common.LogWriterMu.Lock()
+	oldWriter := gin.DefaultErrorWriter
+	gin.DefaultErrorWriter = &logBuffer
+	common.LogWriterMu.Unlock()
+	t.Cleanup(func() {
+		common.LogWriterMu.Lock()
+		gin.DefaultErrorWriter = oldWriter
+		common.LogWriterMu.Unlock()
+	})
+
+	payload, err := BuildOTLPTracePayload(TracePayloadParams{
+		RequestBody:  []byte(`{"model":"gpt-4o"}`),
+		ResponseBody: []byte(`{"ok":true}`),
+		Model:        "gpt-4o",
+		TokenId:      1,
+		TokenName:    "t",
+		ChannelId:    1,
+		RelayMode:    relayconstant.RelayModeChatCompletions,
+		StartTime:    time.Now(),
+		EndTime:      time.Now(),
+		StatusCode:   200,
+	})
+	require.NoError(t, err)
+
+	require.NotPanics(t, func() { ExportOTLPTrace(server.URL, payload) })
+
+	assert.Contains(t, logBuffer.String(), "status 415")
 }

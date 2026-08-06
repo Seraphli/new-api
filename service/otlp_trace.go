@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
-	"encoding/hex"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -20,6 +21,10 @@ import (
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
+	commonpb "go.opentelemetry.io/proto/otlp/common/v1"
+	resourcepb "go.opentelemetry.io/proto/otlp/resource/v1"
+	tracepb "go.opentelemetry.io/proto/otlp/trace/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 // MaxTraceValueBytes bounds the size of a single input.value/output.value
@@ -125,67 +130,16 @@ func TraceCaptureUsage(c *gin.Context, usage *dto.Usage) {
 	buf.HasUsage = true
 }
 
-// otlpAnyValue is the OTLP/protobuf-JSON AnyValue mapping. Only one of the
-// three fields is ever set per attribute.
-type otlpAnyValue struct {
-	StringValue string `json:"stringValue,omitempty"`
-	IntValue    string `json:"intValue,omitempty"`
-	BoolValue   bool   `json:"boolValue,omitempty"`
+func stringAttr(key, value string) *commonpb.KeyValue {
+	return &commonpb.KeyValue{Key: key, Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_StringValue{StringValue: value}}}
 }
 
-type otlpAttribute struct {
-	Key   string       `json:"key"`
-	Value otlpAnyValue `json:"value"`
+func intAttr(key string, value int) *commonpb.KeyValue {
+	return &commonpb.KeyValue{Key: key, Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: int64(value)}}}
 }
 
-type otlpStatus struct {
-	Code    int    `json:"code"`
-	Message string `json:"message,omitempty"`
-}
-
-type otlpSpan struct {
-	TraceId           string          `json:"traceId"`
-	SpanId            string          `json:"spanId"`
-	Name              string          `json:"name"`
-	Kind              int             `json:"kind"`
-	StartTimeUnixNano string          `json:"startTimeUnixNano"`
-	EndTimeUnixNano   string          `json:"endTimeUnixNano"`
-	Attributes        []otlpAttribute `json:"attributes"`
-	Status            otlpStatus      `json:"status"`
-}
-
-type otlpScope struct {
-	Name string `json:"name"`
-}
-
-type otlpScopeSpan struct {
-	Scope otlpScope  `json:"scope"`
-	Spans []otlpSpan `json:"spans"`
-}
-
-type otlpResource struct {
-	Attributes []otlpAttribute `json:"attributes"`
-}
-
-type otlpResourceSpan struct {
-	Resource   otlpResource    `json:"resource"`
-	ScopeSpans []otlpScopeSpan `json:"scopeSpans"`
-}
-
-type otlpTraceEnvelope struct {
-	ResourceSpans []otlpResourceSpan `json:"resourceSpans"`
-}
-
-func stringAttr(key, value string) otlpAttribute {
-	return otlpAttribute{Key: key, Value: otlpAnyValue{StringValue: value}}
-}
-
-func intAttr(key string, value int) otlpAttribute {
-	return otlpAttribute{Key: key, Value: otlpAnyValue{IntValue: strconv.Itoa(value)}}
-}
-
-func boolAttr(key string, value bool) otlpAttribute {
-	return otlpAttribute{Key: key, Value: otlpAnyValue{BoolValue: value}}
+func boolAttr(key string, value bool) *commonpb.KeyValue {
+	return &commonpb.KeyValue{Key: key, Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: value}}}
 }
 
 // truncateToBytes cuts s to at most limit bytes, backing off to the previous
@@ -242,9 +196,9 @@ type TracePayloadParams struct {
 }
 
 // BuildOTLPTracePayload builds one OTLP/OpenInference trace span (wrapped in
-// the standard resourceSpans/scopeSpans envelope) as JSON bytes. Pure
-// function: no I/O, no gin.Context. Never includes a token key, channel key,
-// Authorization header, or DSN.
+// the standard ResourceSpans/ScopeSpans envelope) as OTLP protobuf-encoded
+// bytes. Pure function: no I/O, no gin.Context. Never includes a token key,
+// channel key, Authorization header, or DSN.
 func BuildOTLPTracePayload(p TracePayloadParams) ([]byte, error) {
 	traceIdBytes := make([]byte, 16)
 	if _, err := rand.Read(traceIdBytes); err != nil {
@@ -261,7 +215,7 @@ func BuildOTLPTracePayload(p TracePayloadParams) ([]byte, error) {
 	}
 
 	inputValue, truncated := truncateTraceValue(string(p.RequestBody))
-	attrs := []otlpAttribute{
+	attrs := []*commonpb.KeyValue{
 		stringAttr("openinference.span.kind", "LLM"),
 		stringAttr("input.value", inputValue),
 		stringAttr("input.mime_type", "application/json"),
@@ -302,40 +256,33 @@ func BuildOTLPTracePayload(p TracePayloadParams) ([]byte, error) {
 		attrs = append(attrs, boolAttr("newapi.truncated", true))
 	}
 
-	status := otlpStatus{Code: 1}
+	status := &tracepb.Status{Code: tracepb.Status_STATUS_CODE_OK}
 	if p.IsError {
-		status.Code = 2
+		status.Code = tracepb.Status_STATUS_CODE_ERROR
 		status.Message = maskedErrorSummary(p.UpstreamErrorBody, p.StatusCode)
 	}
 
-	span := otlpSpan{
-		TraceId:           hex.EncodeToString(traceIdBytes),
-		SpanId:            hex.EncodeToString(spanIdBytes),
+	span := &tracepb.Span{
+		TraceId:           traceIdBytes,
+		SpanId:            spanIdBytes,
 		Name:              name,
-		Kind:              1, // SPAN_KIND_INTERNAL
-		StartTimeUnixNano: strconv.FormatInt(p.StartTime.UnixNano(), 10),
-		EndTimeUnixNano:   strconv.FormatInt(p.EndTime.UnixNano(), 10),
+		Kind:              tracepb.Span_SPAN_KIND_INTERNAL,
+		StartTimeUnixNano: uint64(p.StartTime.UnixNano()),
+		EndTimeUnixNano:   uint64(p.EndTime.UnixNano()),
 		Attributes:        attrs,
 		Status:            status,
 	}
 
-	envelope := otlpTraceEnvelope{
-		ResourceSpans: []otlpResourceSpan{
-			{
-				Resource: otlpResource{
-					Attributes: []otlpAttribute{stringAttr("service.name", "new-api")},
-				},
-				ScopeSpans: []otlpScopeSpan{
-					{
-						Scope: otlpScope{Name: "new-api"},
-						Spans: []otlpSpan{span},
-					},
-				},
-			},
-		},
+	ss := &tracepb.ScopeSpans{
+		Scope: &commonpb.InstrumentationScope{Name: "new-api"},
+		Spans: []*tracepb.Span{span},
+	}
+	rs := &tracepb.ResourceSpans{
+		Resource:   &resourcepb.Resource{Attributes: []*commonpb.KeyValue{stringAttr("service.name", "new-api")}},
+		ScopeSpans: []*tracepb.ScopeSpans{ss},
 	}
 
-	return common.Marshal(envelope)
+	return proto.Marshal(&tracepb.TracesData{ResourceSpans: []*tracepb.ResourceSpans{rs}})
 }
 
 // ExportRelayTrace is the deferred entry point for per-token OTLP tracing.
@@ -407,7 +354,7 @@ func ExportOTLPTrace(endpoint string, payload []byte) {
 		common.SysError("otlp trace export failed: " + err.Error())
 		return
 	}
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Type", "application/x-protobuf")
 
 	resp, err := GetHttpClient().Do(req)
 	if err != nil {
@@ -415,4 +362,9 @@ func ExportOTLPTrace(endpoint string, payload []byte) {
 		return
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		preview, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		common.SysError(fmt.Sprintf("otlp trace export failed: status %d, body: %s", resp.StatusCode, preview))
+	}
 }
