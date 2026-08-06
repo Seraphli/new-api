@@ -27,13 +27,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// MaxTraceValueBytes bounds the size of a single input.value/output.value
-// attribute written into an OTLP trace span, to avoid unbounded payload
-// growth on large requests/responses.
-const MaxTraceValueBytes = 131072
-
 // maxTraceStatusMessageBytes bounds the short masked error summary put on
-// the span status when the relay failed.
+// the span status when the relay failed. This caps only the status_message
+// summary, not payload storage: the full error body is exported verbatim in
+// output.value.
 const maxTraceStatusMessageBytes = 300
 
 // traceBuffer accumulates the per-request data needed to build one OTLP
@@ -140,33 +137,23 @@ func intAttr(key string, value int) *commonpb.KeyValue {
 	return &commonpb.KeyValue{Key: key, Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_IntValue{IntValue: int64(value)}}}
 }
 
-func boolAttr(key string, value bool) *commonpb.KeyValue {
-	return &commonpb.KeyValue{Key: key, Value: &commonpb.AnyValue{Value: &commonpb.AnyValue_BoolValue{BoolValue: value}}}
-}
-
 // truncateToBytes cuts s to at most limit bytes, backing off to the previous
 // UTF-8 rune boundary so multi-byte characters are never split.
-func truncateToBytes(s string, limit int) (string, bool) {
+func truncateToBytes(s string, limit int) string {
 	if len(s) <= limit {
-		return s, false
+		return s
 	}
 	cut := limit
 	for cut > 0 && !utf8.RuneStart(s[cut]) {
 		cut--
 	}
-	return s[:cut], true
-}
-
-// truncateTraceValue applies the MaxTraceValueBytes bound used for
-// input.value/output.value attributes.
-func truncateTraceValue(s string) (string, bool) {
-	return truncateToBytes(s, MaxTraceValueBytes)
+	return s[:cut]
 }
 
 // maskedErrorSummary builds a short, masked, non-sensitive status message
 // from the raw upstream error body.
 func maskedErrorSummary(body string, statusCode int) string {
-	masked, _ := truncateToBytes(kitutil.MaskSensitiveInfo(body), maxTraceStatusMessageBytes)
+	masked := truncateToBytes(kitutil.MaskSensitiveInfo(body), maxTraceStatusMessageBytes)
 	if masked == "" {
 		return "status_code=" + strconv.Itoa(statusCode)
 	}
@@ -217,28 +204,21 @@ func BuildOTLPTracePayload(p TracePayloadParams) ([]byte, error) {
 		name = "llm"
 	}
 
-	inputValue, truncated := truncateTraceValue(string(p.RequestBody))
 	attrs := []*commonpb.KeyValue{
 		stringAttr("openinference.span.kind", "LLM"),
-		stringAttr("input.value", inputValue),
+		stringAttr("input.value", string(p.RequestBody)),
 		stringAttr("input.mime_type", "application/json"),
 	}
 
 	switch {
 	case p.IsError:
-		outputValue, outputTruncated := truncateTraceValue(p.UpstreamErrorBody)
-		truncated = truncated || outputTruncated
-		attrs = append(attrs, stringAttr("output.value", outputValue), stringAttr("output.mime_type", "application/json"))
+		attrs = append(attrs, stringAttr("output.value", p.UpstreamErrorBody), stringAttr("output.mime_type", "application/json"))
 	case p.RelayMode == relayconstant.RelayModeAudioSpeech:
 		attrs = append(attrs, stringAttr("newapi.output.omitted", "binary"))
 	case p.IsStream:
-		outputValue, outputTruncated := truncateTraceValue(p.ResponseText)
-		truncated = truncated || outputTruncated
-		attrs = append(attrs, stringAttr("output.value", outputValue), stringAttr("output.mime_type", "text/plain"))
+		attrs = append(attrs, stringAttr("output.value", p.ResponseText), stringAttr("output.mime_type", "text/plain"))
 	default:
-		outputValue, outputTruncated := truncateTraceValue(string(p.ResponseBody))
-		truncated = truncated || outputTruncated
-		attrs = append(attrs, stringAttr("output.value", outputValue), stringAttr("output.mime_type", "application/json"))
+		attrs = append(attrs, stringAttr("output.value", string(p.ResponseBody)), stringAttr("output.mime_type", "application/json"))
 	}
 
 	attrs = append(attrs, stringAttr("llm.model_name", p.Model))
@@ -255,9 +235,6 @@ func BuildOTLPTracePayload(p TracePayloadParams) ([]byte, error) {
 		intAttr("newapi.channel.id", p.ChannelId),
 		intAttr("newapi.http.status_code", p.StatusCode),
 	)
-	if truncated {
-		attrs = append(attrs, boolAttr("newapi.truncated", true))
-	}
 
 	status := &tracepb.Status{Code: tracepb.Status_STATUS_CODE_OK}
 	if p.IsError {

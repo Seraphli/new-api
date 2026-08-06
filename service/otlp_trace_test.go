@@ -309,14 +309,20 @@ func TestStartRelayTrace_EnabledCapturesStreamText(t *testing.T) {
 	assert.Equal(t, "text/plain", outputMime.GetStringValue())
 }
 
-// TC6: input.value beyond MaxTraceValueBytes is truncated and flagged; values
-// within the cap are left untouched with no truncation flag.
-func TestBuildOTLPTracePayload_Truncation(t *testing.T) {
-	longInput := strings.Repeat("a", MaxTraceValueBytes+100)
+// TC6: with the value-size cap removed, input.value and output.value are
+// exported VERBATIM at any size. A request/response larger than the old
+// 131072-byte cap is emitted intact (full length, tail preserved) and no
+// newapi.truncated attribute is present.
+func TestBuildOTLPTracePayload_FullValueNoTruncation(t *testing.T) {
+	const oversized = 131072 + 5000
+	inputTail := "INPUT_TAIL_MARKER_END"
+	outputTail := "OUTPUT_TAIL_MARKER_END"
+	longInput := strings.Repeat("a", oversized) + inputTail
+	longOutput := strings.Repeat("b", oversized) + outputTail
 
 	payload, err := BuildOTLPTracePayload(TracePayloadParams{
 		RequestBody:  []byte(longInput),
-		ResponseBody: []byte(`{"ok":true}`),
+		ResponseBody: []byte(longOutput),
 		Model:        "gpt-4o",
 		TokenId:      1,
 		TokenName:    "t",
@@ -330,30 +336,22 @@ func TestBuildOTLPTracePayload_Truncation(t *testing.T) {
 
 	_, span := firstSpan(t, payload)
 
+	// input.value is intact: full length, over the old cap, tail preserved.
 	inputValue, ok := findAttr(span.Attributes, "input.value")
 	require.True(t, ok)
-	assert.Len(t, inputValue.GetStringValue(), MaxTraceValueBytes)
+	assert.Equal(t, longInput, inputValue.GetStringValue())
+	assert.Greater(t, len(inputValue.GetStringValue()), 131072)
+	assert.True(t, strings.HasSuffix(inputValue.GetStringValue(), inputTail))
 
-	truncatedAttr, ok := findAttr(span.Attributes, "newapi.truncated")
+	// output.value is intact too.
+	outputValue, ok := findAttr(span.Attributes, "output.value")
 	require.True(t, ok)
-	assert.True(t, truncatedAttr.GetBoolValue())
+	assert.Equal(t, longOutput, outputValue.GetStringValue())
+	assert.Greater(t, len(outputValue.GetStringValue()), 131072)
+	assert.True(t, strings.HasSuffix(outputValue.GetStringValue(), outputTail))
 
-	payload2, err := BuildOTLPTracePayload(TracePayloadParams{
-		RequestBody:  []byte(`{"short":true}`),
-		ResponseBody: []byte(`{"ok":true}`),
-		Model:        "gpt-4o",
-		TokenId:      1,
-		TokenName:    "t",
-		ChannelId:    1,
-		RelayMode:    relayconstant.RelayModeChatCompletions,
-		StartTime:    time.Now(),
-		EndTime:      time.Now(),
-		StatusCode:   200,
-	})
-	require.NoError(t, err)
-
-	_, span2 := firstSpan(t, payload2)
-	_, ok = findAttr(span2.Attributes, "newapi.truncated")
+	// The truncation flag is gone entirely.
+	_, ok = findAttr(span.Attributes, "newapi.truncated")
 	assert.False(t, ok)
 }
 
@@ -430,7 +428,6 @@ func TestExportRelayTrace_NoSecretsLeak(t *testing.T) {
 			"newapi.token.name":          true,
 			"newapi.channel.id":          true,
 			"newapi.http.status_code":    true,
-			"newapi.truncated":           true,
 			"newapi.output.omitted":      true,
 		}
 		for _, attr := range span.Attributes {
