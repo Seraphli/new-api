@@ -7,8 +7,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TC8: Token.Update()'s Select allow-list must persist trace_enabled and
-// trace_otlp_endpoint, including an explicit change to false / a new value.
+// TC8: Token.Update()'s Select allow-list must persist trace_enabled,
+// trace_otlp_endpoint and trace_project, including an explicit change to
+// false / a new value.
 func TestTokenUpdatePersistsTraceFields(t *testing.T) {
 	truncateTables(t)
 
@@ -17,6 +18,7 @@ func TestTokenUpdatePersistsTraceFields(t *testing.T) {
 		Key:               "k-trace-1",
 		TraceEnabled:      true,
 		TraceOtlpEndpoint: "http://x/v1/traces",
+		TraceProject:      "proj-a",
 	}
 	require.NoError(t, token.Insert())
 
@@ -24,13 +26,16 @@ func TestTokenUpdatePersistsTraceFields(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, reloaded.TraceEnabled)
 	assert.Equal(t, "http://x/v1/traces", reloaded.TraceOtlpEndpoint)
+	assert.Equal(t, "proj-a", reloaded.TraceProject)
 
 	reloaded.TraceEnabled = false
 	reloaded.TraceOtlpEndpoint = "http://y/v1/traces"
+	reloaded.TraceProject = "proj-b"
 	require.NoError(t, reloaded.Update())
 
 	final, err := GetTokenById(token.Id)
 	require.NoError(t, err)
 	assert.False(t, final.TraceEnabled)
 	assert.Equal(t, "http://y/v1/traces", final.TraceOtlpEndpoint)
+	assert.Equal(t, "proj-b", final.TraceProject)
 }

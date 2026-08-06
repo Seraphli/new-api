@@ -42,6 +42,7 @@ const maxTraceStatusMessageBytes = 300
 // the end of the request to build and export the span.
 type traceBuffer struct {
 	Endpoint          string
+	Project           string
 	ResponseBody      []byte
 	ResponseText      string
 	ResponseIsStream  bool
@@ -67,7 +68,8 @@ func StartRelayTrace(c *gin.Context, info *relaycommon.RelayInfo) bool {
 	if endpoint == "" {
 		return false
 	}
-	c.Set(string(constant.ContextKeyTraceBuffer), &traceBuffer{Endpoint: endpoint})
+	project := common.GetContextKeyString(c, constant.ContextKeyTokenTraceProject)
+	c.Set(string(constant.ContextKeyTraceBuffer), &traceBuffer{Endpoint: endpoint, Project: project})
 	return true
 }
 
@@ -181,6 +183,7 @@ type TracePayloadParams struct {
 	IsStream          bool
 	UpstreamErrorBody string
 	Model             string
+	Project           string
 	TokenId           int
 	TokenName         string
 	ChannelId         int
@@ -277,8 +280,15 @@ func BuildOTLPTracePayload(p TracePayloadParams) ([]byte, error) {
 		Scope: &commonpb.InstrumentationScope{Name: "new-api"},
 		Spans: []*tracepb.Span{span},
 	}
+	resourceAttrs := []*commonpb.KeyValue{stringAttr("service.name", "new-api")}
+	if p.Project != "" {
+		// openinference.project.name routes the span to a named project on
+		// OpenInference-aware backends (e.g. Arize Phoenix). Empty project
+		// leaves it off, so spans land in the backend's default project.
+		resourceAttrs = append(resourceAttrs, stringAttr("openinference.project.name", p.Project))
+	}
 	rs := &tracepb.ResourceSpans{
-		Resource:   &resourcepb.Resource{Attributes: []*commonpb.KeyValue{stringAttr("service.name", "new-api")}},
+		Resource:   &resourcepb.Resource{Attributes: resourceAttrs},
 		ScopeSpans: []*tracepb.ScopeSpans{ss},
 	}
 
@@ -317,6 +327,7 @@ func ExportRelayTrace(c *gin.Context, info *relaycommon.RelayInfo, apiErr *types
 		IsStream:          buf.ResponseIsStream,
 		UpstreamErrorBody: buf.UpstreamErrorBody,
 		Model:             info.OriginModelName,
+		Project:           buf.Project,
 		TokenId:           info.TokenId,
 		TokenName:         c.GetString("token_name"),
 		ChannelId:         info.GetChannelID(),

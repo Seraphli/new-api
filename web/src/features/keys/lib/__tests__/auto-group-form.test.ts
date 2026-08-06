@@ -55,6 +55,7 @@ const baseApiKey: ApiKey = {
   allow_ips: '',
   trace_enabled: false,
   trace_otlp_endpoint: '',
+  trace_project: '',
 }
 
 describe('API key Auto group form mapping', () => {
@@ -187,5 +188,44 @@ describe('API key Auto group form mapping', () => {
       result.error.issues[0]?.message,
       'Auto groups must not contain duplicates'
     )
+  })
+})
+
+describe('API key trace project mapping', () => {
+  test('carries trace_project through the submit payload', () => {
+    const values = {
+      ...getApiKeyFormDefaultValues(false),
+      name: 'traced token',
+      trace_enabled: true,
+      trace_otlp_endpoint: 'http://phoenix:6006/v1/traces',
+      trace_project: 'team-alpha',
+    }
+
+    assert.equal(transformFormDataToPayload(values).trace_project, 'team-alpha')
+  })
+
+  test('defaults trace_project to empty string when omitted', () => {
+    const values = getApiKeyFormDefaultValues(false)
+    assert.equal(transformFormDataToPayload(values).trace_project, '')
+  })
+
+  test('loads trace_project from an existing key into form defaults', () => {
+    const defaults = transformApiKeyToFormDefaults(
+      { ...baseApiKey, trace_project: 'team-beta' },
+      ['default'],
+      2
+    )
+    assert.equal(defaults.trace_project, 'team-beta')
+  })
+
+  test('maps a missing trace_project to empty string on edit', () => {
+    const withoutProject: Record<string, unknown> = { ...baseApiKey }
+    delete withoutProject.trace_project
+    const defaults = transformApiKeyToFormDefaults(
+      apiKeySchema.parse(withoutProject),
+      ['default'],
+      2
+    )
+    assert.equal(defaults.trace_project, '')
   })
 })

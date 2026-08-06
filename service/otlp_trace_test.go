@@ -522,6 +522,80 @@ func TestTraceCaptureUsage_SetsBufferAndPayload(t *testing.T) {
 	assert.Equal(t, int64(7), totalCount.GetIntValue())
 }
 
+// TC12: a non-empty Project routes the span to a named backend project via the
+// openinference.project.name RESOURCE attribute; an empty Project omits it so
+// spans fall back to the backend's default project. The attribute must live on
+// the Resource, never on the span, because that is where Phoenix/OpenInference
+// reads project routing.
+func TestBuildOTLPTracePayload_ProjectRouting(t *testing.T) {
+	withProject, err := BuildOTLPTracePayload(TracePayloadParams{
+		RequestBody:  []byte(`{"model":"gpt-4o"}`),
+		ResponseBody: []byte(`{"ok":true}`),
+		Model:        "gpt-4o",
+		Project:      "team-alpha",
+		TokenId:      1,
+		TokenName:    "t",
+		ChannelId:    1,
+		RelayMode:    relayconstant.RelayModeChatCompletions,
+		StartTime:    time.Now(),
+		EndTime:      time.Now(),
+		StatusCode:   200,
+	})
+	require.NoError(t, err)
+
+	td, span := firstSpan(t, withProject)
+
+	project, ok := findAttr(td.ResourceSpans[0].Resource.Attributes, "openinference.project.name")
+	require.True(t, ok)
+	assert.Equal(t, "team-alpha", project.GetStringValue())
+
+	// service.name stays alongside the project routing attribute.
+	svcName, ok := findAttr(td.ResourceSpans[0].Resource.Attributes, "service.name")
+	require.True(t, ok)
+	assert.Equal(t, "new-api", svcName.GetStringValue())
+
+	// Routing is a RESOURCE attribute, never a span attribute.
+	_, ok = findAttr(span.Attributes, "openinference.project.name")
+	assert.False(t, ok)
+
+	withoutProject, err := BuildOTLPTracePayload(TracePayloadParams{
+		RequestBody:  []byte(`{"model":"gpt-4o"}`),
+		ResponseBody: []byte(`{"ok":true}`),
+		Model:        "gpt-4o",
+		Project:      "",
+		TokenId:      1,
+		TokenName:    "t",
+		ChannelId:    1,
+		RelayMode:    relayconstant.RelayModeChatCompletions,
+		StartTime:    time.Now(),
+		EndTime:      time.Now(),
+		StatusCode:   200,
+	})
+	require.NoError(t, err)
+
+	td2, _ := firstSpan(t, withoutProject)
+	_, ok = findAttr(td2.ResourceSpans[0].Resource.Attributes, "openinference.project.name")
+	assert.False(t, ok)
+}
+
+// TC13: StartRelayTrace copies the per-token trace project from the request
+// context onto the trace buffer, so ExportRelayTrace can route the span.
+func TestStartRelayTrace_CapturesProject(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	common.SetContextKey(c, constant.ContextKeyTokenTraceEnabled, true)
+	common.SetContextKey(c, constant.ContextKeyTokenTraceEndpoint, "http://collector.local/v1/traces")
+	common.SetContextKey(c, constant.ContextKeyTokenTraceProject, "team-alpha")
+
+	info := &relaycommon.RelayInfo{RelayFormat: types.RelayFormatOpenAI}
+	require.True(t, StartRelayTrace(c, info))
+
+	buf := getTraceBuffer(c)
+	require.NotNil(t, buf)
+	assert.Equal(t, "team-alpha", buf.Project)
+}
+
 // TestExportOTLPTrace_LogsNon2xx verifies a non-2xx response from the collector
 // is logged via common.SysError with the status code, and never panics.
 func TestExportOTLPTrace_LogsNon2xx(t *testing.T) {

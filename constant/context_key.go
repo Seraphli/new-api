@@ -22,6 +22,7 @@ const (
 	ContextKeyTokenAutoGroups        ContextKey = "token_auto_groups"
 	ContextKeyTokenTraceEnabled      ContextKey = "token_trace_enabled"
 	ContextKeyTokenTraceEndpoint     ContextKey = "token_trace_endpoint"
+	ContextKeyTokenTraceProject      ContextKey = "token_trace_project"
 	ContextKeyTraceBuffer            ContextKey = "otlp_trace_buffer"
 
 	/* channel related keys */

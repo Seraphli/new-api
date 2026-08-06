@@ -788,6 +788,28 @@ export function ApiKeysMutateDrawer({
                         </FormItem>
                       )}
                     />
+
+                    <FormField
+                      control={form.control}
+                      name='trace_project'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Phoenix project name')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder={t('default (leave empty)')}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t(
+                              'Route spans from this token to a named project (empty = default project)'
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </CollapsibleContent>
               </SideDrawerSection>

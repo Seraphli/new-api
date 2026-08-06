@@ -5280,6 +5280,9 @@
     "Enable request tracing": "Enable request tracing",
     "Export one OpenTelemetry span per request to your OTLP endpoint": "Export one OpenTelemetry span per request to your OTLP endpoint",
     "OTLP trace endpoint": "OTLP trace endpoint",
+    "Phoenix project name": "Phoenix project name",
+    "default (leave empty)": "default (leave empty)",
+    "Route spans from this token to a named project (empty = default project)": "Route spans from this token to a named project (empty = default project)",
     "e.g. http://phoenix:6006/v1/traces": "e.g. http://phoenix:6006/v1/traces"
   },
   "Delete": "削除"
