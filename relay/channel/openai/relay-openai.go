@@ -191,6 +191,8 @@ func OaiStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Re
 
 	HandleFinalResponse(c, info, lastStreamData, responseId, createAt, model, systemFingerprint, usage, containStreamUsage)
 
+	service.TraceCaptureResponseText(c, responseTextBuilder.String())
+
 	return usage, nil
 }
 

@@ -5276,7 +5276,14 @@
     "Request field maps JSON": "請求欄位對應 JSON",
     "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "JSON 陣列，每項含 when/from/to。伺服器僅接受白名單對應。service_tier 對應還需開啟允許 service_tier 透傳。",
     "Fill effort example": "填入 effort 範例",
-    "Fill effort + service_tier example": "填入 effort+service_tier 範例"
+    "Fill effort + service_tier example": "填入 effort+service_tier 範例",
+    "Enable request tracing": "Enable request tracing",
+    "Export one OpenTelemetry span per request to your OTLP endpoint": "Export one OpenTelemetry span per request to your OTLP endpoint",
+    "OTLP trace endpoint": "OTLP trace endpoint",
+    "Phoenix project name": "Phoenix project name",
+    "default (leave empty)": "default (leave empty)",
+    "Route spans from this token to a named project (empty = default project)": "Route spans from this token to a named project (empty = default project)",
+    "e.g. http://phoenix:6006/v1/traces": "e.g. http://phoenix:6006/v1/traces"
   },
   "Delete": "刪除"
 }

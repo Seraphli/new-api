@@ -211,6 +211,7 @@ func ClaudeStreamHandler(c *gin.Context, resp *http.Response, info *relaycommon.
 	}
 
 	HandleStreamFinalResponse(c, info, claudeInfo)
+	service.TraceCaptureResponseText(c, claudeInfo.ResponseText.String())
 	return claudeInfo.Usage, nil
 }
 

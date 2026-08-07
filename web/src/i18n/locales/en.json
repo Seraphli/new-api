@@ -5276,7 +5276,14 @@
     "Request field maps JSON": "Request field maps JSON",
     "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.": "JSON array of {when,from,to}. Only allowlisted pairs are accepted by the server. service_tier also needs allow service_tier on this channel.",
     "Fill effort example": "Fill effort example",
-    "Fill effort + service_tier example": "Fill effort + service_tier example"
+    "Fill effort + service_tier example": "Fill effort + service_tier example",
+    "Enable request tracing": "Enable request tracing",
+    "Export one OpenTelemetry span per request to your OTLP endpoint": "Export one OpenTelemetry span per request to your OTLP endpoint",
+    "OTLP trace endpoint": "OTLP trace endpoint",
+    "Phoenix project name": "Phoenix project name",
+    "default (leave empty)": "default (leave empty)",
+    "Route spans from this token to a named project (empty = default project)": "Route spans from this token to a named project (empty = default project)",
+    "e.g. http://phoenix:6006/v1/traces": "e.g. http://phoenix:6006/v1/traces"
   },
   "Delete": "Delete"
 }

@@ -1,0 +1,4 @@
+{
+  "Export one OpenTelemetry span per request to your OTLP endpoint": "Export one OpenTelemetry span per request to your OTLP endpoint",
+  "Route spans from this token to a named project (empty = default project)": "Route spans from this token to a named project (empty = default project)"
+}

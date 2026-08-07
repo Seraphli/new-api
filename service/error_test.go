@@ -2,10 +2,10 @@ package service
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -85,7 +85,9 @@ func TestRelayErrorHandlerTruncatesInvalidJSONBodyInLog(t *testing.T) {
 		Body:       io.NopCloser(strings.NewReader(body)),
 	}
 
-	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+	newAPIError := RelayErrorHandler(c, resp, false)
 
 	require.NotNil(t, newAPIError)
 	require.Equal(t, "bad response status code 500", newAPIError.Error())
@@ -102,7 +104,9 @@ func TestRelayErrorHandlerKeepsStructuredErrorMessage(t *testing.T) {
 		Body:       io.NopCloser(strings.NewReader(body)),
 	}
 
-	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+	newAPIError := RelayErrorHandler(c, resp, false)
 
 	require.NotNil(t, newAPIError)
 	require.Equal(t, message, newAPIError.Error())
@@ -116,7 +120,9 @@ func TestRelayErrorHandlerKeepsOpenAIErrorMessage(t *testing.T) {
 		Body:       io.NopCloser(strings.NewReader(body)),
 	}
 
-	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+	newAPIError := RelayErrorHandler(c, resp, false)
 
 	require.NotNil(t, newAPIError)
 	require.Equal(t, message, newAPIError.Error())
@@ -143,7 +149,9 @@ func TestRelayErrorHandlerKeepsInvalidJSONBodyInDebugLog(t *testing.T) {
 		Body:       io.NopCloser(strings.NewReader(body)),
 	}
 
-	newAPIError := RelayErrorHandler(context.Background(), resp, false)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+	newAPIError := RelayErrorHandler(c, resp, false)
 
 	require.NotNil(t, newAPIError)
 	require.NotContains(t, logBuffer.String(), "[truncated")

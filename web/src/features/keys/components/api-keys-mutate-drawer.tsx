@@ -744,6 +744,72 @@ export function ApiKeysMutateDrawer({
                         </FormItem>
                       )}
                     />
+
+                    <FormField
+                      control={form.control}
+                      name='trace_enabled'
+                      render={({ field }) => (
+                        <FormItem className={sideDrawerSwitchItemClassName()}>
+                          <div className='flex flex-col gap-0.5'>
+                            <FormLabel className='text-sm'>
+                              {t('Enable request tracing')}
+                            </FormLabel>
+                            <FormDescription className='text-xs'>
+                              {t(
+                                'Export one OpenTelemetry span per request to your OTLP endpoint'
+                              )}
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name='trace_otlp_endpoint'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('OTLP trace endpoint')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder={t(
+                                'e.g. http://phoenix:6006/v1/traces'
+                              )}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name='trace_project'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('Phoenix project name')}</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              placeholder={t('default (leave empty)')}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t(
+                              'Route spans from this token to a named project (empty = default project)'
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
                 </CollapsibleContent>
               </SideDrawerSection>

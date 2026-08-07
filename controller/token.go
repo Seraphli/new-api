@@ -324,6 +324,9 @@ func AddToken(c *gin.Context) {
 		UnlimitedQuota:     token.UnlimitedQuota,
 		ModelLimitsEnabled: token.ModelLimitsEnabled,
 		ModelLimits:        token.ModelLimits,
+		TraceEnabled:       token.TraceEnabled,
+		TraceOtlpEndpoint:  token.TraceOtlpEndpoint,
+		TraceProject:       token.TraceProject,
 		AllowIps:           token.AllowIps,
 		Group:              token.Group,
 		CrossGroupRetry:    token.CrossGroupRetry,
@@ -404,6 +407,9 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.UnlimitedQuota = token.UnlimitedQuota
 		cleanToken.ModelLimitsEnabled = token.ModelLimitsEnabled
 		cleanToken.ModelLimits = token.ModelLimits
+		cleanToken.TraceEnabled = token.TraceEnabled
+		cleanToken.TraceOtlpEndpoint = token.TraceOtlpEndpoint
+		cleanToken.TraceProject = token.TraceProject
 		cleanToken.AllowIps = token.AllowIps
 		cleanToken.Group = token.Group
 		cleanToken.CrossGroupRetry = token.CrossGroupRetry
