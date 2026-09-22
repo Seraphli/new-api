@@ -1,6 +1,9 @@
-import { describe, expect, test } from 'bun:test'
+import { describe, expect, test } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
 
 const LOCALES = ['en', 'zh', 'zh-TW', 'fr', 'ja', 'ru', 'vi'] as const
 
@@ -16,10 +19,7 @@ const REQUIRED_KEYS = [
 describe('request field maps i18n namespace', () => {
   for (const loc of LOCALES) {
     test(`${loc}: keys live under translation, not root`, () => {
-      const path = join(
-        import.meta.dir,
-        `../src/i18n/locales/${loc}.json`
-      )
+      const path = join(__dirname, `../src/i18n/locales/${loc}.json`)
       const data = JSON.parse(readFileSync(path, 'utf8')) as Record<
         string,
         unknown
